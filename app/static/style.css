@@ -1,0 +1,35 @@
+/* Styles for the Email Timeline Tool */
+#timeline-container {
+    margin-top: 20px;
+}
+
+.email-entry {
+    border: 1px solid #ccc;
+    padding: 10px;
+    margin-bottom: 10px;
+    cursor: pointer; /* Indicates it's clickable */
+}
+
+.email-body {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-top: 1px dashed #eee;
+}
+
+.email-body pre {
+    white-space: pre-wrap; /* Allows text to wrap */
+    word-wrap: break-word;
+}
+
+.editable-summary, .editable-parties {
+    display: inline-block; /* Or block, depending on desired layout */
+    min-width: 100px; /* So it's clickable even if empty */
+    padding: 3px;
+    border: 1px dashed #ccc;
+}
+.editable-summary:focus, .editable-parties:focus {
+    background-color: #f0f8ff; /* AliceBlue */
+    border: 1px solid #88c5ff;
+    outline: none;
+}
