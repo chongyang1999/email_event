@@ -7,10 +7,20 @@ from datetime import datetime
 # Adjust sys.path for importing from the app directory
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# Attempt to import app components
+app_module = None
 try:
-    from app.app import parse_email_file
-except ImportError:
-    parse_email_file = None # Placeholder if import fails
+    import app.app as app_module
+    app = app_module.app
+    parse_email_file = app_module.parse_email_file
+    # Access global variables through the imported module
+    # parsed_emails will be app_module.parsed_emails
+    # email_id_counter will be app_module.email_id_counter
+except ImportError as e:
+    print(f"Error importing app module: {e}")
+    app = None
+    parse_email_file = None
+
 
 class TestEmailParser(unittest.TestCase):
 
@@ -120,11 +130,63 @@ class TestEmailParser(unittest.TestCase):
         parsed_data = parse_email_file(tmp_filepath)
         os.unlink(tmp_filepath)
 
-        if 'email_id_counter' in sys.modules['app.app'].__dict__:
-            sys.modules['app.app'].__dict__['email_id_counter'] = original_counter
+        if app_module and hasattr(app_module, 'email_id_counter'):
+            app_module.email_id_counter = original_counter
         
         self.assertIsNotNone(parsed_data)
         self.assertIsInstance(parsed_data.get('date'), datetime)
+
+
+class TestAppRoutes(unittest.TestCase):
+
+    def setUp(self):
+        if app is None:
+            self.skipTest("Skipping route tests: Flask app could not be imported.")
+        
+        app.testing = True
+        self.client = app.test_client()
+        
+        # Reset global state for emails before each test
+        if app_module:
+            app_module.parsed_emails[:] = [] 
+            app_module.email_id_counter = 0 # Reset counter
+
+            # Add sample emails
+            app_module.parsed_emails.append({'id': 1, 'from': 't1@ex.com', 'to': 'r1@ex.com', 'subject': 'Test Email 1', 'date': datetime.now(), 'body': 'Body 1', 'summary': 'Sum1', 'relevant_parties': 'RP1'})
+            app_module.parsed_emails.append({'id': 2, 'from': 't2@ex.com', 'to': 'r2@ex.com', 'subject': 'Test Email 2', 'date': datetime.now(), 'body': 'Body 2', 'summary': 'Sum2', 'relevant_parties': 'RP2'})
+            app_module.email_id_counter = 2 # Reflect the manually added items
+
+    def tearDown(self):
+        # Clean up global state
+        if app_module:
+            app_module.parsed_emails[:] = []
+            app_module.email_id_counter = 0
+
+    def test_delete_email_success(self):
+        if not app_module: self.skipTest("App module not loaded")
+        initial_count = len(app_module.parsed_emails)
+        response = self.client.post('/delete_email/1') # Assuming ID 1 exists from setUp
+        
+        self.assertEqual(response.status_code, 200)
+        json_data = response.get_json()
+        self.assertEqual(json_data['status'], 'success')
+        
+        self.assertEqual(len(app_module.parsed_emails), initial_count - 1)
+        ids_remaining = [email['id'] for email in app_module.parsed_emails]
+        self.assertNotIn(1, ids_remaining)
+        self.assertIn(2, ids_remaining) # Check that other emails are not affected
+
+    def test_delete_email_not_found(self):
+        if not app_module: self.skipTest("App module not loaded")
+        initial_count = len(app_module.parsed_emails)
+        response = self.client.post('/delete_email/999') # Non-existent ID
+        
+        self.assertEqual(response.status_code, 404)
+        json_data = response.get_json()
+        self.assertEqual(json_data['status'], 'error')
+        self.assertEqual(json_data['message'], 'Email not found')
+        
+        self.assertEqual(len(app_module.parsed_emails), initial_count) # List should be unchanged
 
 if __name__ == '__main__':
     unittest.main()

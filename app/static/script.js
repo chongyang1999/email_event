@@ -26,61 +26,81 @@ document.addEventListener('DOMContentLoaded', () => {
                 const entryDiv = document.createElement('div');
                 entryDiv.className = 'email-entry';
 
-                const dateH = document.createElement('h3');
-                try {
-                    // Attempt to format the date, provide fallback for invalid dates
-                    dateH.textContent = email.date ? new Date(email.date).toLocaleString() : 'Date N/A';
-                } catch (e) {
-                    dateH.textContent = email.date || 'Date N/A (invalid format)'; // Show raw date if parsing fails
-                }
-                entryDiv.appendChild(dateH);
+                // --- Create Header ---
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'email-header';
 
+                const dotSpan = document.createElement('span');
+                dotSpan.className = 'email-dot';
+                headerDiv.appendChild(dotSpan);
+
+                const dateSpan = document.createElement('span');
+                dateSpan.className = 'email-date';
+                try {
+                    dateSpan.textContent = email.date ? new Date(email.date).toLocaleString() : 'Date N/A';
+                } catch (e) {
+                    dateSpan.textContent = email.date || 'Date N/A (invalid format)';
+                }
+                headerDiv.appendChild(dateSpan);
+
+                const summaryPreviewSpan = document.createElement('span');
+                summaryPreviewSpan.className = 'email-summary-preview';
+                summaryPreviewSpan.textContent = email.summary || 'N/A';
+                headerDiv.appendChild(summaryPreviewSpan);
+                
+                entryDiv.appendChild(headerDiv);
+
+                // --- Create Details (collapsible) ---
+                const detailsDiv = document.createElement('div');
+                detailsDiv.className = 'email-details';
+                detailsDiv.style.display = 'none'; // Initially hidden
+
+                // Move existing content generation logic here:
                 const fromP = document.createElement('p');
                 fromP.innerHTML = `<strong>From:</strong> ${email.from || 'N/A'}`;
-                entryDiv.appendChild(fromP);
+                detailsDiv.appendChild(fromP);
 
                 const toP = document.createElement('p');
                 toP.innerHTML = `<strong>To:</strong> ${email.to || 'N/A'}`;
-                entryDiv.appendChild(toP);
+                detailsDiv.appendChild(toP);
                 
                 const ccP = document.createElement('p');
                 ccP.innerHTML = `<strong>Cc:</strong> ${email.cc || 'N/A'}`;
-                entryDiv.appendChild(ccP);
+                detailsDiv.appendChild(ccP);
 
                 const subjectP = document.createElement('p');
                 subjectP.innerHTML = `<strong>Subject:</strong> ${email.subject || 'N/A'}`;
-                entryDiv.appendChild(subjectP);
+                detailsDiv.appendChild(subjectP);
 
-                // Editable Summary
-                const summaryP = document.createElement('p');
-                summaryP.innerHTML = `<strong>Summary:</strong> `;
-                const summarySpan = document.createElement('span');
-                summarySpan.id = `summary-${email.id}`;
-                summarySpan.className = 'editable-summary';
-                summarySpan.contentEditable = true;
-                summarySpan.textContent = email.summary || 'N/A';
-                summaryP.appendChild(summarySpan);
-                entryDiv.appendChild(summaryP);
+                // Editable Summary (label + span) - for editing, distinct from preview
+                const summaryEditableP = document.createElement('p');
+                summaryEditableP.innerHTML = `<strong>Summary (edit):</strong> `; // Changed label slightly for clarity
+                const summaryEditableSpan = document.createElement('span');
+                summaryEditableSpan.id = `summary-${email.id}`;
+                summaryEditableSpan.className = 'editable-summary';
+                summaryEditableSpan.contentEditable = true;
+                summaryEditableSpan.textContent = email.summary || 'N/A';
+                summaryEditableP.appendChild(summaryEditableSpan);
+                detailsDiv.appendChild(summaryEditableP);
 
-                // Editable Relevant Parties
+                // Editable Relevant Parties (label + span)
                 const relevantPartiesP = document.createElement('p');
                 relevantPartiesP.innerHTML = `<strong>Relevant Parties:</strong> `;
                 const relevantPartiesSpan = document.createElement('span');
-                relevantPartiesSpan.id = `relevant-parties-${email.id}`; // ID on the span
+                relevantPartiesSpan.id = `relevant-parties-${email.id}`;
                 relevantPartiesSpan.className = 'editable-parties';
                 relevantPartiesSpan.contentEditable = true;
                 relevantPartiesSpan.textContent = email.relevant_parties || 'None specified';
                 relevantPartiesP.appendChild(relevantPartiesSpan);
-                entryDiv.appendChild(relevantPartiesP);
+                detailsDiv.appendChild(relevantPartiesP);
 
                 // Save Button
                 const saveButton = document.createElement('button');
                 saveButton.id = `save-btn-${email.id}`;
                 saveButton.textContent = 'Save Changes';
-                saveButton.style.marginTop = '5px'; // Basic styling
+                saveButton.style.marginTop = '5px';
                 saveButton.addEventListener('click', () => {
-                    const currentEmailId = email.id; // 'email.id' is in scope from the loop
-
+                    const currentEmailId = email.id;
                     const updatedSummaryElement = document.getElementById(`summary-${currentEmailId}`);
                     const updatedPartiesElement = document.getElementById(`relevant-parties-${currentEmailId}`);
 
@@ -89,25 +109,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         alert('Error: Could not find fields to save.');
                         return;
                     }
-
                     const updatedSummary = updatedSummaryElement.textContent;
                     const updatedParties = updatedPartiesElement.textContent;
-
+                    
                     fetch(`/update_email/${currentEmailId}`, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            summary: updatedSummary,
-                            relevant_parties: updatedParties,
-                        }),
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ summary: updatedSummary, relevant_parties: updatedParties }),
                     })
                     .then(response => response.json())
                     .then(data => {
-                        console.log('Save response:', data);
                         if (data.status === 'success') {
                             alert('Changes saved successfully!');
+                            // Update the summary preview in the header if save is successful
+                            if(summaryPreviewSpan) summaryPreviewSpan.textContent = updatedSummary;
                         } else {
                             alert('Error saving changes: ' + data.message);
                         }
@@ -117,31 +132,73 @@ document.addEventListener('DOMContentLoaded', () => {
                         alert('Error saving changes. See console for details.');
                     });
                 });
-                entryDiv.appendChild(saveButton);
+                detailsDiv.appendChild(saveButton);
 
+                // Delete Button
+                const deleteButton = document.createElement('button');
+                deleteButton.id = `delete-btn-${email.id}`;
+                deleteButton.textContent = 'Delete';
+                deleteButton.style.marginLeft = '5px';
+                deleteButton.style.marginTop = '5px';
+                deleteButton.addEventListener('click', () => {
+                    const currentEmailId = email.id;
+                    if (confirm('Are you sure you want to delete this email?')) {
+                        fetch(`/delete_email/${currentEmailId}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                return response.json().then(errData => {
+                                    throw new Error(errData.message || `Server error: ${response.status}`);
+                                }).catch(() => { throw new Error(`Server error: ${response.status}`); });
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (data.status === 'success') {
+                                alert('Email deleted successfully!');
+                                fetchAndDisplayEmails(); // Refresh timeline
+                            } else {
+                                alert('Error deleting email: ' + (data.message || 'Unknown error'));
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error deleting email:', error);
+                            alert('Failed to delete email: ' + error.message);
+                        });
+                    }
+                });
+                detailsDiv.appendChild(deleteButton);
+
+                // Full Email Body
                 const bodyDiv = document.createElement('div');
-                bodyDiv.className = 'email-body';
-                bodyDiv.style.display = 'none'; // Initially hidden
-                
+                bodyDiv.className = 'email-body'; // This was the previous container for <pre>
                 const preformattedBody = document.createElement('pre');
                 preformattedBody.textContent = email.body || 'No body content.';
                 bodyDiv.appendChild(preformattedBody);
-                entryDiv.appendChild(bodyDiv);
+                detailsDiv.appendChild(bodyDiv); // Append the full body to detailsDiv
 
-                entryDiv.addEventListener('click', (event) => {
-                    // Prevent click on links inside body from toggling
-                    if (event.target.tagName === 'A' && bodyDiv.contains(event.target)) {
-                        return;
+                // The old click listener on entryDiv that toggled the body directly should be removed
+                // as the header will handle this in the next step.
+
+                // Add click listener to headerDiv to toggle detailsDiv
+                headerDiv.addEventListener('click', () => {
+                    // detailsDiv is in scope here from the forEach loop
+                    if (detailsDiv.style.display === 'none' || detailsDiv.style.display === '') {
+                        detailsDiv.style.display = 'block';
+                    } else {
+                        detailsDiv.style.display = 'none';
                     }
-                    bodyDiv.style.display = bodyDiv.style.display === 'none' ? 'block' : 'none';
                 });
 
+                entryDiv.appendChild(detailsDiv);
                 timelineContainer.appendChild(entryDiv);
             });
 
         } catch (error) {
             console.error('Error fetching or displaying emails:', error);
-            if (timelineContainer) { // Check again in case it became null
+            if (timelineContainer) {
                 timelineContainer.innerHTML = `<p>Error loading emails: ${error.message}. Please try again later.</p>`;
             }
         }
@@ -153,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (downloadPdfButton) {
         downloadPdfButton.addEventListener('click', () => {
             console.log('Requesting PDF download...');
-            window.location.href = '/download_pdf'; // Navigate to the PDF download route
+            window.location.href = '/download_pdf';
         });
     }
 });

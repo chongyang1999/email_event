@@ -213,22 +213,32 @@ def download_pdf():
     story.append(Spacer(1, 0.2*inch))
 
     for email in sorted_emails:
+        # Date (as a prominent entry start)
         story.append(Paragraph(f"Date: {email.get('date_str', 'N/A')}", styles['h2']))
+        story.append(Spacer(1, 0.1*inch)) # Small spacer after date
+
+        # From, To, Subject
         story.append(Paragraph(f"From: {email.get('from', 'N/A')}", styles['Normal']))
-        story.append(Paragraph(f"To: {email.get('to', 'N/A')}", styles['Normal']))
-        if email.get('cc'):
+        if email.get('to'): # Only show To if it exists
+            story.append(Paragraph(f"To: {email.get('to', 'N/A')}", styles['Normal']))
+        if email.get('cc'): # Only show Cc if it exists
             story.append(Paragraph(f"Cc: {email.get('cc')}", styles['Normal']))
         story.append(Paragraph(f"Subject: {email.get('subject', 'N/A')}", styles['Normal']))
         story.append(Spacer(1, 0.1*inch))
+
+        # User-edited fields
         story.append(Paragraph(f"<b>Relevant Parties:</b> {email.get('relevant_parties', 'N/A')}", styles['Normal']))
         story.append(Paragraph(f"<b>Summary:</b> {email.get('summary', 'N/A')}", styles['Normal']))
-        story.append(Spacer(1, 0.1*inch))
-        
-        body_text = email.get('body', 'N/A').replace('\n', '<br/>')
-        story.append(Paragraph("<b>Full Email Body:</b>", styles['Normal']))
-        story.append(Paragraph(body_text, styles['BodyText']))
-        story.append(Spacer(1, 0.3*inch))
+        story.append(Spacer(1, 0.15*inch)) # Spacer before body
 
+        # Full Email Body
+        story.append(Paragraph("<b>Full Email Body:</b>", styles['Normal']))
+        body_text = email.get('body', 'N/A').replace('\n', '<br/>') # Ensure this replace is effective
+        story.append(Paragraph(body_text, styles['BodyText']))
+
+        story.append(Spacer(1, 0.4*inch)) # Larger spacer between email entries
+        # story.append(PageBreak()) # Uncomment if you prefer each email on a new page
+        
     doc.build(story)
     pdf_buffer.seek(0)
 
@@ -238,6 +248,22 @@ def download_pdf():
         download_name='email_timeline.pdf',
         mimetype='application/pdf'
     )
+
+@app.route('/delete_email/<int:email_id>', methods=['POST'])
+def delete_email(email_id):
+    global parsed_emails
+    
+    initial_length = len(parsed_emails)
+    # List comprehension to create a new list excluding the item to delete
+    parsed_emails[:] = [email for email in parsed_emails if email.get('id') != email_id]
+    
+    if len(parsed_emails) < initial_length:
+        # For debugging
+        # print(f"Deleted email with ID: {email_id}")
+        # print(parsed_emails)
+        return jsonify({'status': 'success', 'message': 'Email deleted successfully'})
+    else:
+        return jsonify({'status': 'error', 'message': 'Email not found'}), 404
 
 if __name__ == '__main__':
     app.run(debug=True)

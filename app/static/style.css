@@ -1,13 +1,68 @@
-/* Styles for the Email Timeline Tool */
+/* app/static/style.css */
 #timeline-container {
     margin-top: 20px;
 }
 
 .email-entry {
     border: 1px solid #ccc;
-    padding: 10px;
     margin-bottom: 10px;
-    cursor: pointer; /* Indicates it's clickable */
+    /* remove padding if header/details handle it - old padding was 10px */
+}
+
+.email-header {
+    padding: 10px;
+    background-color: #f0f0f0; /* Light background for header */
+    display: flex; /* For alignment */
+    align-items: center; /* Vertical alignment */
+    cursor: pointer; /* Indicate it's clickable for next step */
+}
+
+.email-dot {
+    width: 12px;
+    height: 12px;
+    background-color: #007bff; /* Blue dot */
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 10px;
+    flex-shrink: 0; /* Prevents the dot from shrinking */
+}
+
+.email-date {
+    font-weight: bold;
+    margin-right: 15px;
+    font-size: 0.9em;
+    flex-shrink: 0; /* Prevents date from shrinking */
+}
+
+.email-summary-preview {
+    font-size: 0.9em;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* max-width: 60%; */ /* Removed to allow it to take available space */
+    /* Flex properties will handle its ability to grow and shrink. */
+    flex-grow: 1; /* Allows the summary to take up remaining space */
+    min-width: 0; /* Important for text-overflow to work in flex items */
+}
+
+.email-details {
+    padding: 15px;
+    border-top: 1px solid #eee;
+    background-color: #fdfdfd;
+}
+
+.editable-summary, .editable-parties {
+    display: inline-block; 
+    min-width: 100px; 
+    padding: 3px;
+    border: 1px dashed #ccc;
+    background-color: #fff; /* Ensure it's distinct from details background */
+}
+.editable-summary:focus, .editable-parties:focus {
+    background-color: #f0f8ff; /* AliceBlue */
+    border: 1px solid #88c5ff;
+    outline: none;
 }
 
 .email-body {
@@ -18,18 +73,6 @@
 }
 
 .email-body pre {
-    white-space: pre-wrap; /* Allows text to wrap */
+    white-space: pre-wrap; 
     word-wrap: break-word;
-}
-
-.editable-summary, .editable-parties {
-    display: inline-block; /* Or block, depending on desired layout */
-    min-width: 100px; /* So it's clickable even if empty */
-    padding: 3px;
-    border: 1px dashed #ccc;
-}
-.editable-summary:focus, .editable-parties:focus {
-    background-color: #f0f8ff; /* AliceBlue */
-    border: 1px solid #88c5ff;
-    outline: none;
 }
