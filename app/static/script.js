@@ -9,23 +9,72 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         timelineContainer.innerHTML = '<p>Loading emails...</p>'; // Initial message
 
-        try {
-            // Use currentSortOrder (defined in the same DOMContentLoaded scope)
-            const response = await fetch(`/timeline_data?sort_order=${currentSortOrder}`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+        let emailsToDisplay = [];
+
+        if (window.EMBEDDED_EMAILS) {
+            // --- Embedded Mode ---
+            console.log("Using embedded email data.");
+            emailsToDisplay = [...window.EMBEDDED_EMAILS]; // Create a mutable copy
+
+            // Client-side sort for embedded data
+            // 'date' field in EMBEDDED_EMAILS is expected to be ISO string from backend processing
+            const sortKey = 'date'; 
+            emailsToDisplay.sort((a, b) => {
+                const valA = a[sortKey] || '';
+                const valB = b[sortKey] || '';
+                // Ensure consistent comparison, especially if dates can be empty strings
+                if (valA === '' && valB === '') return 0;
+                if (valA === '') return 1; // Empty strings sort last
+                if (valB === '') return -1;
+
+                if (currentSortOrder === 'oldest_first') {
+                    return valA.localeCompare(valB);
+                } else { // newest_first
+                    return valB.localeCompare(valA);
+                }
+            });
+            
+            // Update sort button text to reflect the current client-side sort order
+            const toggleSortBtn = document.getElementById('toggle-sort-btn');
+            if (toggleSortBtn) {
+                toggleSortBtn.textContent = currentSortOrder === 'newest_first' ? 'Sort: Newest First' : 'Sort: Oldest First';
             }
-            const emails = await response.json();
+
 
             timelineContainer.innerHTML = ''; // Clear loading message
-
-            if (emails.length === 0) {
-                timelineContainer.innerHTML = '<p>No emails to display. Upload an email file first.</p>';
-                return;
+            if (emailsToDisplay.length === 0) {
+                timelineContainer.innerHTML = '<p>No emails in this export.</p>';
+                return; // Exit if no emails to display
             }
+            // UI adjustments for embedded mode will be done once after this function
+            // or can be triggered here.
+        } else {
+            // --- Live Mode ---
+            console.log("Fetching email data from server.");
+            try {
+                const response = await fetch(`/timeline_data?sort_order=${currentSortOrder}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                emailsToDisplay = await response.json();
+                timelineContainer.innerHTML = ''; // Clear loading message
 
-            emails.forEach(email => {
-                const entryDiv = document.createElement('div');
+                if (emailsToDisplay.length === 0) {
+                    timelineContainer.innerHTML = '<p>No emails to display. Upload an email file first.</p>';
+                    return; // Exit if no emails from server
+                }
+            } catch (error) {
+                console.error('Error fetching or displaying emails:', error);
+                if (timelineContainer) {
+                    timelineContainer.innerHTML = `<p>Error loading emails: ${error.message}. Please try again later.</p>`;
+                }
+                return; // Exit on fetch error
+            }
+        }
+
+        // Common rendering logic for both modes
+        emailsToDisplay.forEach(email => {
+            const entryDiv = document.createElement('div');
                 entryDiv.className = 'email-entry';
 
                 // --- Create Header ---
@@ -113,26 +162,43 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     const updatedSummary = updatedSummaryElement.textContent;
                     const updatedParties = updatedPartiesElement.textContent;
-                    
-                    fetch(`/update_email/${currentEmailId}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ summary: updatedSummary, relevant_parties: updatedParties }),
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            alert('Changes saved successfully!');
-                            // Update the summary preview in the header if save is successful
+
+                    if (window.EMBEDDED_EMAILS) {
+                        // --- Embedded Mode Save ---
+                        const emailToUpdate = window.EMBEDDED_EMAILS.find(e => e.id === currentEmailId);
+                        if (emailToUpdate) {
+                            emailToUpdate.summary = updatedSummary;
+                            emailToUpdate.relevant_parties = updatedParties;
+                            
+                            // Update the UI directly
                             if(summaryPreviewSpan) summaryPreviewSpan.textContent = updatedSummary;
+                            // updatedSummaryElement.textContent = updatedSummary; // Already done by contentEditable
+                            // updatedPartiesElement.textContent = updatedParties; // Already done by contentEditable
+                            alert('Changes saved in this exported file. Note: These changes are not persisted to any server and will be lost if you reload the file from its original source.');
                         } else {
-                            alert('Error saving changes: ' + data.message);
+                            alert('Error: Could not find email to update in embedded data.');
                         }
-                    })
-                    .catch(error => {
-                        console.error('Error saving changes:', error);
-                        alert('Error saving changes. See console for details.');
-                    });
+                    } else {
+                        // --- Live Mode Save ---
+                        fetch(`/update_email/${currentEmailId}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ summary: updatedSummary, relevant_parties: updatedParties }),
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === 'success') {
+                                alert('Changes saved successfully!');
+                                if(summaryPreviewSpan) summaryPreviewSpan.textContent = updatedSummary;
+                            } else {
+                                alert('Error saving changes: ' + data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error saving changes:', error);
+                            alert('Error saving changes. See console for details.');
+                        });
+                    }
                 });
                 detailsDiv.appendChild(saveButton);
 
@@ -145,30 +211,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 deleteButton.addEventListener('click', () => {
                     const currentEmailId = email.id;
                     if (confirm('Are you sure you want to delete this email?')) {
-                        fetch(`/delete_email/${currentEmailId}`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                        })
-                        .then(response => {
-                            if (!response.ok) {
-                                return response.json().then(errData => {
-                                    throw new Error(errData.message || `Server error: ${response.status}`);
-                                }).catch(() => { throw new Error(`Server error: ${response.status}`); });
-                            }
-                            return response.json();
-                        })
-                        .then(data => {
-                            if (data.status === 'success') {
-                                alert('Email deleted successfully!');
-                                fetchAndDisplayEmails(); // Refresh timeline
-                            } else {
-                                alert('Error deleting email: ' + (data.message || 'Unknown error'));
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error deleting email:', error);
-                            alert('Failed to delete email: ' + error.message);
-                        });
+                        if (window.EMBEDDED_EMAILS) {
+                            // --- Embedded Mode Delete ---
+                            window.EMBEDDED_EMAILS = window.EMBEDDED_EMAILS.filter(e => e.id !== currentEmailId);
+                            fetchAndDisplayEmails(); // Re-render from the modified embedded list
+                            alert('Email deleted from this exported file. Note: This change is not persisted to any server.');
+                        } else {
+                            // --- Live Mode Delete ---
+                            fetch(`/delete_email/${currentEmailId}`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                            })
+                            .then(response => {
+                                if (!response.ok) {
+                                    return response.json().then(errData => {
+                                        throw new Error(errData.message || `Server error: ${response.status}`);
+                                    }).catch(() => { throw new Error(`Server error: ${response.status}`); });
+                                }
+                                return response.json();
+                            })
+                            .then(data => {
+                                if (data.status === 'success') {
+                                    alert('Email deleted successfully!');
+                                    fetchAndDisplayEmails(); // Refresh timeline
+                                } else {
+                                    alert('Error deleting email: ' + (data.message || 'Unknown error'));
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error deleting email:', error);
+                                alert('Failed to delete email: ' + error.message);
+                            });
+                        }
                     }
                 });
                 detailsDiv.appendChild(deleteButton);
@@ -206,12 +280,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    fetchAndDisplayEmails();
+    
+    // Initial setup based on mode
+    if (window.EMBEDDED_EMAILS) {
+        const pdfBtn = document.getElementById('download-pdf-btn');
+        if (pdfBtn) pdfBtn.style.display = 'none';
+        const htmlBtn = document.getElementById('download-html-btn');
+        if (htmlBtn) htmlBtn.style.display = 'none';
+        
+        const mainTitle = document.querySelector('h1'); // Assuming there's only one H1 for the main title
+        if (mainTitle) mainTitle.textContent = 'Email Timeline (Exported View)';
+
+        // Set currentSortOrder based on embedded value for initial load in embedded mode
+        if (window.EMBEDDED_SORT_ORDER) {
+            currentSortOrder = window.EMBEDDED_SORT_ORDER;
+        }
+    }
+    
+    fetchAndDisplayEmails(); // Initial call
 
     const downloadPdfButton = document.getElementById('download-pdf-btn');
     if (downloadPdfButton) {
         downloadPdfButton.addEventListener('click', () => {
-            // currentSortOrder is defined in the same DOMContentLoaded scope
             console.log('Requesting PDF download with sort order:', currentSortOrder);
             window.location.href = `/download_pdf?sort_order=${currentSortOrder}`; 
         });
@@ -232,12 +322,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const downloadMarkdownButton = document.getElementById('download-markdown-btn');
-    if (downloadMarkdownButton) {
-        downloadMarkdownButton.addEventListener('click', () => {
+    const downloadHtmlButton = document.getElementById('download-html-btn');
+    if (downloadHtmlButton) {
+        downloadHtmlButton.addEventListener('click', () => {
             // currentSortOrder should be the variable holding the current sort state
-            console.log('Requesting Markdown download with sort order:', currentSortOrder); 
-            window.location.href = `/download_markdown?sort_order=${currentSortOrder}`;
+            console.log('Requesting HTML download with sort order:', currentSortOrder); 
+            window.location.href = `/download_html?sort_order=${currentSortOrder}`;
         });
     }
 });

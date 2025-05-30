@@ -3,6 +3,7 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify, s
 from werkzeug.utils import secure_filename
 from email.parser import BytesParser
 from email.policy import default as email_policy # Renamed to avoid conflict
+import json # For json.dumps
 from email.utils import parsedate_to_datetime
 from datetime import datetime
 import io # To handle the PDF in memory
@@ -352,76 +353,118 @@ def delete_email(email_id):
     else:
         return jsonify({'status': 'error', 'message': 'Email not found'}), 404
 
-@app.route('/download_markdown')
-def download_markdown():
+@app.route('/download_html')
+def download_html():
     global parsed_emails
     sort_order_param = request.args.get('sort_order', 'newest_first')
 
-    emails_for_markdown = []
+    # Process emails for sorting and ensure dates are strings for JSON
+    emails_for_export = []
     for email_item in parsed_emails:
         item_copy = email_item.copy()
         raw_date = item_copy.get('date')
-        if hasattr(raw_date, 'isoformat'):
+        if hasattr(raw_date, 'isoformat'): # Datetime object
             item_copy['sortable_date'] = raw_date.isoformat()
             item_copy['date_str'] = raw_date.strftime('%Y-%m-%d %H:%M:%S')
-        elif isinstance(raw_date, str) and raw_date:
-            try:
+        elif isinstance(raw_date, str) and raw_date: # Non-empty string
+            try: # Try to parse to datetime then reformat, for consistency
                 dt_obj = parsedate_to_datetime(raw_date)
                 item_copy['sortable_date'] = dt_obj.isoformat()
                 item_copy['date_str'] = dt_obj.strftime('%Y-%m-%d %H:%M:%S')
-            except Exception:
+            except Exception: # If parsing fails, use as is
                 item_copy['sortable_date'] = raw_date
                 item_copy['date_str'] = raw_date
-        else:
+        else: # None or other types
             item_copy['sortable_date'] = ''
             item_copy['date_str'] = 'N/A'
-        emails_for_markdown.append(item_copy)
+        
+        # Ensure all relevant fields for the HTML are strings for JSON dump
+        for key in ['from', 'to', 'cc', 'subject', 'summary', 'relevant_parties', 'body']:
+            if item_copy.get(key) is None:
+                item_copy[key] = "" # Or 'N/A' if preferred for display
+        
+        emails_for_export.append(item_copy)
 
     reverse_order = True if sort_order_param == 'newest_first' else False
     try:
         sorted_emails = sorted(
-            emails_for_markdown,
+            emails_for_export,
             key=lambda x: x.get('sortable_date', '') if x.get('sortable_date') is not None else '',
             reverse=reverse_order
         )
     except Exception as e:
-        print(f"Error sorting emails for Markdown: {e}")
-        sorted_emails = emails_for_markdown # Fallback to unsorted
+        print(f"Error sorting emails for HTML export: {e}")
+        sorted_emails = emails_for_export # Fallback
 
-    markdown_lines = ["# Email Timeline", ""]
-    for email in sorted_emails:
-        from_val = email.get('from', 'N/A')
-        subject_val = email.get('subject', 'N/A')
-        date_str_val = email.get('date_str', 'N/A')
-        
-        summary_line = f"<summary>Date: {date_str_val} | From: {from_val} | Subject: {subject_val}</summary>"
-        markdown_lines.append(f"<details>")
-        markdown_lines.append(summary_line)
-        markdown_lines.append("") 
+    emails_json_string = json.dumps(sorted_emails) # Create JSON string from sorted emails
 
-        to_val = email.get('to')
-        if to_val:
-            markdown_lines.append(f"**To:** {to_val}")
-        cc_val = email.get('cc')
-        if cc_val:
-            markdown_lines.append(f"**Cc:** {cc_val}")
-        
-        markdown_lines.append(f"**Relevant Parties:** {email.get('relevant_parties', 'N/A')}")
-        markdown_lines.append(f"**Summary (Edited):** {email.get('summary', 'N/A')}")
-        markdown_lines.append("") 
-        markdown_lines.append("---") 
-        markdown_lines.append("**Full Email Body:**")
-        markdown_lines.append("```text")
-        markdown_lines.append(email.get('body', 'N/A'))
-        markdown_lines.append("```")
-        markdown_lines.append("---")
-        markdown_lines.append(f"</details>")
-        markdown_lines.append("") 
+    # Read static CSS content
+    css_content = "/* CSS could not be loaded */" # Default
+    try:
+        css_path = os.path.join(app.root_path, 'static', 'style.css')
+        with open(css_path, 'r', encoding='utf-8') as f:
+            css_content = f.read()
+    except Exception as e:
+        print(f"Error reading CSS file for HTML export: {e}")
 
-    markdown_content = "\n".join(markdown_lines)
+    # Read static JavaScript content
+    original_js_content = "alert('JavaScript could not be loaded.');" # Default
+    try:
+        js_path = os.path.join(app.root_path, 'static', 'script.js')
+        with open(js_path, 'r', encoding='utf-8') as f:
+            original_js_content = f.read()
+    except Exception as e:
+        print(f"Error reading JavaScript file for HTML export: {e}")
+
+    # Construct HTML
+    # The actual JavaScript modification to use embedded data will be handled
+    # by adapting script.js itself in a subsequent step.
+    # Here, we just ensure the data is embedded and the original script is included.
+    html_output = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Timeline Export</title>
+    <style>
+        {css_content}
+    </style>
+</head>
+<body>
+    <h1>Email Timeline Export</h1>
     
-    response = Response(markdown_content, mimetype='text/markdown; charset=utf-8')
-    response.headers['Content-Disposition'] = 'attachment; filename=email_timeline.md'
+    <div style="text-align: center; margin: 20px;">
+        <!-- Static export might not need functional buttons, or they can be adapted -->
+        <button onclick="alert('Sorting not available in static export. Data is pre-sorted as per selection: {sort_order_param}.');">
+            Sort: {'Newest First' if sort_order_param == 'newest_first' else 'Oldest First'}
+        </button>
+        <button onclick="alert('PDF download not available in static export.');">Download Timeline as PDF</button>
+    </div>
+
+    <div id="timeline-container">
+        <p>Loading timeline from embedded data...</p>
+    </div>
+
+    <script type="text/javascript">
+        // Embed the email data
+        window.EMBEDDED_EMAILS = JSON.parse('{emails_json_string}');
+        window.EMBEDDED_SORT_ORDER = '{sort_order_param}'; // Embed sort order as well
+
+        // Include the original script content
+        {original_js_content}
+
+        // The original script.js is expected to have its DOMContentLoaded listener.
+        // It will be modified in the next step to check for window.EMBEDDED_EMAILS.
+        // If found, it will use that data instead of fetching.
+        // The sort button in this static HTML is just for display of initial sort.
+    </script>
+</body>
+</html>
+    """
+
+    response = Response(html_output, mimetype='text/html; charset=utf-8')
+    response.headers['Content-Disposition'] = 'attachment; filename=email_timeline.html'
     return response
 
 if __name__ == '__main__':
