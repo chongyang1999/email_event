@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const timelineContainer = document.getElementById('timeline-container');
+    let currentSortOrder = 'newest_first'; // Global state for sort order
 
     async function fetchAndDisplayEmails() {
         if (!timelineContainer) {
@@ -9,7 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
         timelineContainer.innerHTML = '<p>Loading emails...</p>'; // Initial message
 
         try {
-            const response = await fetch('/timeline_data');
+            // Use currentSortOrder (defined in the same DOMContentLoaded scope)
+            const response = await fetch(`/timeline_data?sort_order=${currentSortOrder}`);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -209,8 +211,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const downloadPdfButton = document.getElementById('download-pdf-btn');
     if (downloadPdfButton) {
         downloadPdfButton.addEventListener('click', () => {
-            console.log('Requesting PDF download...');
-            window.location.href = '/download_pdf';
+            // currentSortOrder is defined in the same DOMContentLoaded scope
+            console.log('Requesting PDF download with sort order:', currentSortOrder);
+            window.location.href = `/download_pdf?sort_order=${currentSortOrder}`; 
+        });
+    }
+
+    const toggleSortButton = document.getElementById('toggle-sort-btn');
+    if (toggleSortButton) {
+        toggleSortButton.addEventListener('click', function() { // Use 'function' to get 'this' as button
+            if (currentSortOrder === 'newest_first') {
+                currentSortOrder = 'oldest_first';
+                this.textContent = 'Sort: Oldest First';
+            } else {
+                currentSortOrder = 'newest_first';
+                this.textContent = 'Sort: Newest First';
+            }
+            console.log("Current sort order:", currentSortOrder); // For debugging
+            fetchAndDisplayEmails(); // Will be updated later to pass sort order
         });
     }
 });

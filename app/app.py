@@ -8,8 +8,10 @@ from datetime import datetime
 import io # To handle the PDF in memory
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 
 app = Flask(__name__)
@@ -99,50 +101,95 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    if 'email_file' not in request.files:
-        return redirect(request.url)
-    file = request.files['email_file']
-    if file.filename == '':
-        return redirect(request.url)
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        
-        parsed_email_data = parse_email_file(filepath)
-        if parsed_email_data:
-            parsed_emails.append(parsed_email_data)
-            print(f"Parsed emails: {parsed_emails}") # For debugging
+    global parsed_emails # Ensure this is accessible
+    # global email_id_counter # parse_email_file handles this internally
 
-        return redirect(url_for('index'))
-    else:
-        return redirect(request.url)
+    # Check if the post request has the file part for 'email_files'
+    if 'email_files' not in request.files:
+        # Consider adding a flash message here if you implement them
+        return redirect(request.url) # Or url_for('index')
+
+    uploaded_files = request.files.getlist("email_files")
+    
+    # If the user does not select a file, the browser submits an
+    # empty file without a filename.
+    if not uploaded_files or all(f.filename == '' for f in uploaded_files):
+        # Consider adding a flash message here
+        return redirect(request.url) # Or url_for('index')
+
+    processed_count = 0
+    error_count = 0
+
+    for file in uploaded_files:
+        # If the user selects an empty file part without filename
+        if file.filename == '':
+            continue # Skip this empty part
+
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            try:
+                file.save(filepath)
+                # parse_email_file uses global email_id_counter and increments it
+                parsed_data = parse_email_file(filepath) 
+                if parsed_data:
+                    parsed_emails.append(parsed_data) # Appending to global list
+                    processed_count += 1
+                    # print(f"Successfully parsed: {filename}") # For debugging
+                else:
+                    # File was saved, but parsing failed
+                    print(f"Parsing failed for: {filename}")
+                    error_count +=1 
+            except Exception as e:
+                print(f"Error processing file {filename}: {e}")
+                error_count += 1
+        elif file.filename != '': # File was provided but not of allowed type
+            print(f"File type not allowed for {file.filename}")
+            error_count += 1
+            
+    # Optional: Add flash messages for processed_count and error_count
+    # if processed_count > 0:
+    #     flash(f"Successfully processed {processed_count} email(s).", "success")
+    # if error_count > 0:
+    #     flash(f"Failed to process {error_count} file(s). Check server logs for details.", "danger")
+    # if processed_count == 0 and error_count == 0 and not any(f.filename for f in uploaded_files if f): # Should not happen if initial checks are fine
+    #     flash("No valid files were found to process.", "warning")
+
+
+    return redirect(url_for('index')) # Redirect to index page to show updated timeline
 
 @app.route('/timeline_data')
 def timeline_data():
+    global parsed_emails # Ensure this is accessible
+    
+    # Create a new list with dates converted to ISO format strings if they are datetime objects
     emails_for_json = []
-    for email_item in parsed_emails:
-        item_copy = email_item.copy()
-        # Ensure date is serializable
+    for email_item in parsed_emails: # Use global parsed_emails
+        item_copy = email_item.copy() 
         if hasattr(item_copy.get('date'), 'isoformat'):
             item_copy['date'] = item_copy['date'].isoformat()
         elif item_copy.get('date') is not None and not isinstance(item_copy.get('date'), str):
-            # If it's not a datetime object but also not a string, convert to string
+             # If it's not a datetime object but also not a string, convert to string
             item_copy['date'] = str(item_copy['date'])
         emails_for_json.append(item_copy)
+
+    sort_order_param = request.args.get('sort_order', 'newest_first') # Default to newest_first
     
-    # Sort by date. Assuming date is now an ISO string or a string that sorts chronologically.
-    # Handle cases where 'date' might be None or not present for some emails.
+    reverse_order = True # Default for newest_first
+    if sort_order_param == 'oldest_first':
+        reverse_order = False
+        
     try:
-        # Sort by date, newest first. Put items with no date at the end.
+        # Assuming 'date' is a string that allows chronological sorting (like ISO format)
+        # Handle cases where 'date' might be None or not present for some emails.
         sorted_emails = sorted(
             emails_for_json, 
             key=lambda x: x.get('date', '') if x.get('date') is not None else '', 
-            reverse=True
+            reverse=reverse_order
         )
     except TypeError as e:
         print(f"Could not sort emails: {e}")
-        # Fallback if sorting fails (e.g. unexpected data types)
+        # Fallback if sorting fails
         sorted_emails = emails_for_json
 
     return jsonify(sorted_emails)
@@ -178,66 +225,106 @@ def update_email(email_id):
 
 @app.route('/download_pdf')
 def download_pdf():
-    global parsed_emails 
+    global parsed_emails # Access the global list
     
+    sort_order_param = request.args.get('sort_order', 'newest_first') # Default to newest_first
+
+    # Prepare emails for PDF, including a sortable/displayable date string
     emails_for_pdf = []
-    for email_item in parsed_emails:
+    for email_item in parsed_emails: # Use global parsed_emails
         item_copy = email_item.copy()
-        if hasattr(item_copy.get('date'), 'isoformat'): 
-            item_copy['date_str'] = item_copy['date'].strftime('%Y-%m-%d %H:%M:%S') if item_copy['date'] else 'N/A'
-        elif isinstance(item_copy.get('date'), str):
-            item_copy['date_str'] = item_copy['date'] 
-        else:
-            item_copy['date_str'] = 'N/A' 
+        # Ensure 'date' exists and handle its type for reliable sorting and display
+        raw_date = item_copy.get('date') # This is the original date object or string
+        
+        if hasattr(raw_date, 'isoformat'): # Check if it's a datetime object
+            item_copy['sortable_date'] = raw_date.isoformat() # Use ISO format for robust sorting
+            item_copy['date_str'] = raw_date.strftime('%Y-%m-%d %H:%M:%S') # Formatted for display
+        elif isinstance(raw_date, str) and raw_date: # If it's already a non-empty string
+            # Attempt to parse it into a datetime object to standardize, then reformat
+            # This handles cases where it might be a date string in a parsable format but not datetime
+            try:
+                dt_obj = parsedate_to_datetime(raw_date) # Or use dateutil.parser if more flexible parsing needed
+                item_copy['sortable_date'] = dt_obj.isoformat()
+                item_copy['date_str'] = dt_obj.strftime('%Y-%m-%d %H:%M:%S')
+            except Exception: # If parsing fails, use the string as is for sorting and display
+                item_copy['sortable_date'] = raw_date 
+                item_copy['date_str'] = raw_date
+        else: # Fallback for unexpected types or None/empty string
+            item_copy['sortable_date'] = '' # Ensure it's sortable (empty string sorts consistently)
+            item_copy['date_str'] = 'N/A'
         emails_for_pdf.append(item_copy)
 
+    reverse_order = True # Default for newest_first
+    if sort_order_param == 'oldest_first':
+        reverse_order = False
+            
     try:
-        # Sort by date, newest first. Using the original 'date' field for sorting.
+        # Sort by the 'sortable_date' field.
         sorted_emails = sorted(
             emails_for_pdf, 
-            key=lambda x: x.get('date') if x.get('date') is not None else (datetime.min if hasattr(datetime, 'min') else ''), 
-            reverse=True
+            key=lambda x: x.get('sortable_date', '') if x.get('sortable_date') is not None else '', 
+            reverse=reverse_order
         )
-    except Exception as e: 
-        print(f"Could not sort emails for PDF: {e}")
-        sorted_emails = emails_for_pdf # Fallback to unsorted if specific date objects cause issues
+    except TypeError as e: # Catch type errors during sorting
+        print(f"Could not sort emails for PDF due to TypeError: {e}")
+        sorted_emails = emails_for_pdf # Fallback to unsorted
+    except Exception as e: # Catch any other unexpected errors
+        print(f"An unexpected error occurred during PDF email sorting: {e}")
+        sorted_emails = emails_for_pdf
+
 
     pdf_buffer = io.BytesIO()
     doc = SimpleDocTemplate(pdf_buffer, pagesize=letter,
                             rightMargin=72, leftMargin=72,
                             topMargin=72, bottomMargin=18)
-    styles = getSampleStyleSheet()
-    story = []
+    styles = getSampleStyleSheet() # Base styles
 
-    story.append(Paragraph("Email Timeline", styles['h1']))
+    # Register CJK Font and Create CJK-compatible Styles
+    try:
+        # Path assumes app.py is in 'app' directory, and 'static' is a sub-directory of 'app'
+        font_path = os.path.join(app.root_path, 'static', 'fonts', 'NotoSansCJKsc-Regular.otf')
+        pdfmetrics.registerFont(TTFont('NotoSansCJK', font_path))
+        
+        styles_cjk = {
+            'Normal_CJK': ParagraphStyle('Normal_CJK', parent=styles['Normal'], fontName='NotoSansCJK', leading=styles['Normal'].leading * 1.2),
+            'BodyText_CJK': ParagraphStyle('BodyText_CJK', parent=styles['BodyText'], fontName='NotoSansCJK', leading=styles['BodyText'].leading * 1.2),
+            'h1_CJK': ParagraphStyle('h1_CJK', parent=styles['h1'], fontName='NotoSansCJK', leading=styles['h1'].leading * 1.2),
+            'h2_CJK': ParagraphStyle('h2_CJK', parent=styles['h2'], fontName='NotoSansCJK', leading=styles['h2'].leading * 1.2),
+        }
+        # Fallback to default styles if font registration fails or styles are not created
+        # This might happen if the font file is missing or corrupted.
+        if not os.path.exists(font_path): # Check if font file exists
+             print(f"Font file not found at {font_path}. PDF may not render CJK characters correctly.")
+             styles_cjk = styles # Use default styles as fallback
+    except Exception as e:
+        print(f"Error registering CJK font or creating styles: {e}. Using default styles.")
+        styles_cjk = styles # Use default styles as fallback
+
+    story = []
+    story.append(Paragraph("Email Timeline", styles_cjk.get('h1_CJK', styles['h1']))) # Use CJK style, fallback to default
     story.append(Spacer(1, 0.2*inch))
 
     for email in sorted_emails:
-        # Date (as a prominent entry start)
-        story.append(Paragraph(f"Date: {email.get('date_str', 'N/A')}", styles['h2']))
-        story.append(Spacer(1, 0.1*inch)) # Small spacer after date
-
-        # From, To, Subject
-        story.append(Paragraph(f"From: {email.get('from', 'N/A')}", styles['Normal']))
-        if email.get('to'): # Only show To if it exists
-            story.append(Paragraph(f"To: {email.get('to', 'N/A')}", styles['Normal']))
-        if email.get('cc'): # Only show Cc if it exists
-            story.append(Paragraph(f"Cc: {email.get('cc')}", styles['Normal']))
-        story.append(Paragraph(f"Subject: {email.get('subject', 'N/A')}", styles['Normal']))
+        story.append(Paragraph(f"Date: {email.get('date_str', 'N/A')}", styles_cjk.get('h2_CJK', styles['h2'])))
         story.append(Spacer(1, 0.1*inch))
 
-        # User-edited fields
-        story.append(Paragraph(f"<b>Relevant Parties:</b> {email.get('relevant_parties', 'N/A')}", styles['Normal']))
-        story.append(Paragraph(f"<b>Summary:</b> {email.get('summary', 'N/A')}", styles['Normal']))
-        story.append(Spacer(1, 0.15*inch)) # Spacer before body
+        story.append(Paragraph(f"From: {email.get('from', 'N/A')}", styles_cjk.get('Normal_CJK', styles['Normal'])))
+        if email.get('to'):
+            story.append(Paragraph(f"To: {email.get('to', 'N/A')}", styles_cjk.get('Normal_CJK', styles['Normal'])))
+        if email.get('cc'):
+            story.append(Paragraph(f"Cc: {email.get('cc')}", styles_cjk.get('Normal_CJK', styles['Normal'])))
+        story.append(Paragraph(f"Subject: {email.get('subject', 'N/A')}", styles_cjk.get('Normal_CJK', styles['Normal'])))
+        story.append(Spacer(1, 0.1*inch))
 
-        # Full Email Body
-        story.append(Paragraph("<b>Full Email Body:</b>", styles['Normal']))
-        body_text = email.get('body', 'N/A').replace('\n', '<br/>') # Ensure this replace is effective
-        story.append(Paragraph(body_text, styles['BodyText']))
+        story.append(Paragraph(f"<b>Relevant Parties:</b> {email.get('relevant_parties', 'N/A')}", styles_cjk.get('Normal_CJK', styles['Normal'])))
+        story.append(Paragraph(f"<b>Summary:</b> {email.get('summary', 'N/A')}", styles_cjk.get('Normal_CJK', styles['Normal'])))
+        story.append(Spacer(1, 0.15*inch))
 
-        story.append(Spacer(1, 0.4*inch)) # Larger spacer between email entries
-        # story.append(PageBreak()) # Uncomment if you prefer each email on a new page
+        story.append(Paragraph("<b>Full Email Body:</b>", styles_cjk.get('Normal_CJK', styles['Normal'])))
+        body_text = email.get('body', 'N/A').replace('\n', '<br/>')
+        story.append(Paragraph(body_text, styles_cjk.get('BodyText_CJK', styles['BodyText'])))
+        
+        story.append(Spacer(1, 0.4*inch))
         
     doc.build(story)
     pdf_buffer.seek(0)

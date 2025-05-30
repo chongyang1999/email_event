@@ -11,8 +11,8 @@
 
     <h2>Upload Email File</h2>
     <form method="POST" action="{{ url_for('upload_file') }}" enctype="multipart/form-data">
-      <input type="file" name="email_file" accept=".eml,.mbox">
-      <input type="submit" value="Upload Email">
+      <input type="file" name="email_files" accept=".eml,.mbox" multiple>
+      <input type="submit" value="Upload Email(s)">
     </form>
 
     <hr>
@@ -20,6 +20,7 @@
 
     <div style="text-align: center; margin: 20px;">
         <button id="download-pdf-btn">Download Timeline as PDF</button>
+        <button id="toggle-sort-btn" style="margin-left: 10px;">Sort: Newest First</button>
     </div>
 
     <div id="timeline-container">
