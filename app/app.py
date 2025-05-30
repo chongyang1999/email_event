@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, jsonify, send_file # Added send_file
+from flask import Flask, render_template, request, redirect, url_for, jsonify, send_file, Response # Added Response
 from werkzeug.utils import secure_filename
 from email.parser import BytesParser
 from email.policy import default as email_policy # Renamed to avoid conflict
@@ -351,6 +351,78 @@ def delete_email(email_id):
         return jsonify({'status': 'success', 'message': 'Email deleted successfully'})
     else:
         return jsonify({'status': 'error', 'message': 'Email not found'}), 404
+
+@app.route('/download_markdown')
+def download_markdown():
+    global parsed_emails
+    sort_order_param = request.args.get('sort_order', 'newest_first')
+
+    emails_for_markdown = []
+    for email_item in parsed_emails:
+        item_copy = email_item.copy()
+        raw_date = item_copy.get('date')
+        if hasattr(raw_date, 'isoformat'):
+            item_copy['sortable_date'] = raw_date.isoformat()
+            item_copy['date_str'] = raw_date.strftime('%Y-%m-%d %H:%M:%S')
+        elif isinstance(raw_date, str) and raw_date:
+            try:
+                dt_obj = parsedate_to_datetime(raw_date)
+                item_copy['sortable_date'] = dt_obj.isoformat()
+                item_copy['date_str'] = dt_obj.strftime('%Y-%m-%d %H:%M:%S')
+            except Exception:
+                item_copy['sortable_date'] = raw_date
+                item_copy['date_str'] = raw_date
+        else:
+            item_copy['sortable_date'] = ''
+            item_copy['date_str'] = 'N/A'
+        emails_for_markdown.append(item_copy)
+
+    reverse_order = True if sort_order_param == 'newest_first' else False
+    try:
+        sorted_emails = sorted(
+            emails_for_markdown,
+            key=lambda x: x.get('sortable_date', '') if x.get('sortable_date') is not None else '',
+            reverse=reverse_order
+        )
+    except Exception as e:
+        print(f"Error sorting emails for Markdown: {e}")
+        sorted_emails = emails_for_markdown # Fallback to unsorted
+
+    markdown_lines = ["# Email Timeline", ""]
+    for email in sorted_emails:
+        from_val = email.get('from', 'N/A')
+        subject_val = email.get('subject', 'N/A')
+        date_str_val = email.get('date_str', 'N/A')
+        
+        summary_line = f"<summary>Date: {date_str_val} | From: {from_val} | Subject: {subject_val}</summary>"
+        markdown_lines.append(f"<details>")
+        markdown_lines.append(summary_line)
+        markdown_lines.append("") 
+
+        to_val = email.get('to')
+        if to_val:
+            markdown_lines.append(f"**To:** {to_val}")
+        cc_val = email.get('cc')
+        if cc_val:
+            markdown_lines.append(f"**Cc:** {cc_val}")
+        
+        markdown_lines.append(f"**Relevant Parties:** {email.get('relevant_parties', 'N/A')}")
+        markdown_lines.append(f"**Summary (Edited):** {email.get('summary', 'N/A')}")
+        markdown_lines.append("") 
+        markdown_lines.append("---") 
+        markdown_lines.append("**Full Email Body:**")
+        markdown_lines.append("```text")
+        markdown_lines.append(email.get('body', 'N/A'))
+        markdown_lines.append("```")
+        markdown_lines.append("---")
+        markdown_lines.append(f"</details>")
+        markdown_lines.append("") 
+
+    markdown_content = "\n".join(markdown_lines)
+    
+    response = Response(markdown_content, mimetype='text/markdown; charset=utf-8')
+    response.headers['Content-Disposition'] = 'attachment; filename=email_timeline.md'
+    return response
 
 if __name__ == '__main__':
     app.run(debug=True)

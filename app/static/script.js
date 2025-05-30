@@ -231,4 +231,13 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchAndDisplayEmails(); // Will be updated later to pass sort order
         });
     }
+
+    const downloadMarkdownButton = document.getElementById('download-markdown-btn');
+    if (downloadMarkdownButton) {
+        downloadMarkdownButton.addEventListener('click', () => {
+            // currentSortOrder should be the variable holding the current sort state
+            console.log('Requesting Markdown download with sort order:', currentSortOrder); 
+            window.location.href = `/download_markdown?sort_order=${currentSortOrder}`;
+        });
+    }
 });
