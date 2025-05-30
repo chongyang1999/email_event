@@ -59,7 +59,7 @@ def parse_email_file(filepath):
                         payload = part.get_payload(decode=True)
                         charset = part.get_content_charset() or 'utf-8'
                         body = payload.decode(charset, 'ignore')
-                        break 
+                        break
                     except Exception as e:
                         print(f"Error decoding part: {e}")
                         body = "Error decoding body part."
@@ -72,7 +72,7 @@ def parse_email_file(filepath):
                 except Exception as e:
                     print(f"Error decoding message: {e}")
                     body = "Error decoding body."
-        
+
         if not body:
             body = "No plain text content found."
 
@@ -111,7 +111,7 @@ def upload_file():
         return redirect(request.url) # Or url_for('index')
 
     uploaded_files = request.files.getlist("email_files")
-    
+
     # If the user does not select a file, the browser submits an
     # empty file without a filename.
     if not uploaded_files or all(f.filename == '' for f in uploaded_files):
@@ -132,7 +132,7 @@ def upload_file():
             try:
                 file.save(filepath)
                 # parse_email_file uses global email_id_counter and increments it
-                parsed_data = parse_email_file(filepath) 
+                parsed_data = parse_email_file(filepath)
                 if parsed_data:
                     parsed_emails.append(parsed_data) # Appending to global list
                     processed_count += 1
@@ -140,14 +140,14 @@ def upload_file():
                 else:
                     # File was saved, but parsing failed
                     print(f"Parsing failed for: {filename}")
-                    error_count +=1 
+                    error_count +=1
             except Exception as e:
                 print(f"Error processing file {filename}: {e}")
                 error_count += 1
         elif file.filename != '': # File was provided but not of allowed type
             print(f"File type not allowed for {file.filename}")
             error_count += 1
-            
+
     # Optional: Add flash messages for processed_count and error_count
     # if processed_count > 0:
     #     flash(f"Successfully processed {processed_count} email(s).", "success")
@@ -162,11 +162,11 @@ def upload_file():
 @app.route('/timeline_data')
 def timeline_data():
     global parsed_emails # Ensure this is accessible
-    
+
     # Create a new list with dates converted to ISO format strings if they are datetime objects
     emails_for_json = []
     for email_item in parsed_emails: # Use global parsed_emails
-        item_copy = email_item.copy() 
+        item_copy = email_item.copy()
         if hasattr(item_copy.get('date'), 'isoformat'):
             item_copy['date'] = item_copy['date'].isoformat()
         elif item_copy.get('date') is not None and not isinstance(item_copy.get('date'), str):
@@ -175,17 +175,17 @@ def timeline_data():
         emails_for_json.append(item_copy)
 
     sort_order_param = request.args.get('sort_order', 'newest_first') # Default to newest_first
-    
+
     reverse_order = True # Default for newest_first
     if sort_order_param == 'oldest_first':
         reverse_order = False
-        
+
     try:
         # Assuming 'date' is a string that allows chronological sorting (like ISO format)
         # Handle cases where 'date' might be None or not present for some emails.
         sorted_emails = sorted(
-            emails_for_json, 
-            key=lambda x: x.get('date', '') if x.get('date') is not None else '', 
+            emails_for_json,
+            key=lambda x: x.get('date', '') if x.get('date') is not None else '',
             reverse=reverse_order
         )
     except TypeError as e:
@@ -210,13 +210,13 @@ def update_email(email_id):
         if email_item['id'] == email_id:
             email_to_update = email_item
             break
-    
+
     if email_to_update:
         if updated_summary is not None:
             email_to_update['summary'] = updated_summary
         if updated_parties is not None:
             email_to_update['relevant_parties'] = updated_parties
-        
+
         # For debugging, you can print the updated list
         # print(f"Updated email {email_id}: {email_to_update}")
         # print(parsed_emails)
@@ -227,7 +227,7 @@ def update_email(email_id):
 @app.route('/download_pdf')
 def download_pdf():
     global parsed_emails # Access the global list
-    
+
     sort_order_param = request.args.get('sort_order', 'newest_first') # Default to newest_first
 
     # Prepare emails for PDF, including a sortable/displayable date string
@@ -236,7 +236,7 @@ def download_pdf():
         item_copy = email_item.copy()
         # Ensure 'date' exists and handle its type for reliable sorting and display
         raw_date = item_copy.get('date') # This is the original date object or string
-        
+
         if hasattr(raw_date, 'isoformat'): # Check if it's a datetime object
             item_copy['sortable_date'] = raw_date.isoformat() # Use ISO format for robust sorting
             item_copy['date_str'] = raw_date.strftime('%Y-%m-%d %H:%M:%S') # Formatted for display
@@ -248,7 +248,7 @@ def download_pdf():
                 item_copy['sortable_date'] = dt_obj.isoformat()
                 item_copy['date_str'] = dt_obj.strftime('%Y-%m-%d %H:%M:%S')
             except Exception: # If parsing fails, use the string as is for sorting and display
-                item_copy['sortable_date'] = raw_date 
+                item_copy['sortable_date'] = raw_date
                 item_copy['date_str'] = raw_date
         else: # Fallback for unexpected types or None/empty string
             item_copy['sortable_date'] = '' # Ensure it's sortable (empty string sorts consistently)
@@ -258,12 +258,12 @@ def download_pdf():
     reverse_order = True # Default for newest_first
     if sort_order_param == 'oldest_first':
         reverse_order = False
-            
+
     try:
         # Sort by the 'sortable_date' field.
         sorted_emails = sorted(
-            emails_for_pdf, 
-            key=lambda x: x.get('sortable_date', '') if x.get('sortable_date') is not None else '', 
+            emails_for_pdf,
+            key=lambda x: x.get('sortable_date', '') if x.get('sortable_date') is not None else '',
             reverse=reverse_order
         )
     except TypeError as e: # Catch type errors during sorting
@@ -285,7 +285,7 @@ def download_pdf():
         # Path assumes app.py is in 'app' directory, and 'static' is a sub-directory of 'app'
         font_path = os.path.join(app.root_path, 'static', 'fonts', 'NotoSansCJKsc-Regular.otf')
         pdfmetrics.registerFont(TTFont('NotoSansCJK', font_path))
-        
+
         styles_cjk = {
             'Normal_CJK': ParagraphStyle('Normal_CJK', parent=styles['Normal'], fontName='NotoSansCJK', leading=styles['Normal'].leading * 1.2),
             'BodyText_CJK': ParagraphStyle('BodyText_CJK', parent=styles['BodyText'], fontName='NotoSansCJK', leading=styles['BodyText'].leading * 1.2),
@@ -324,9 +324,9 @@ def download_pdf():
         story.append(Paragraph("<b>Full Email Body:</b>", styles_cjk.get('Normal_CJK', styles['Normal'])))
         body_text = email.get('body', 'N/A').replace('\n', '<br/>')
         story.append(Paragraph(body_text, styles_cjk.get('BodyText_CJK', styles['BodyText'])))
-        
+
         story.append(Spacer(1, 0.4*inch))
-        
+
     doc.build(story)
     pdf_buffer.seek(0)
 
@@ -340,11 +340,11 @@ def download_pdf():
 @app.route('/delete_email/<int:email_id>', methods=['POST'])
 def delete_email(email_id):
     global parsed_emails
-    
+
     initial_length = len(parsed_emails)
     # List comprehension to create a new list excluding the item to delete
     parsed_emails[:] = [email for email in parsed_emails if email.get('id') != email_id]
-    
+
     if len(parsed_emails) < initial_length:
         # For debugging
         # print(f"Deleted email with ID: {email_id}")
@@ -379,7 +379,7 @@ def download_html():
                 item_copy['sortable_date'] = dt_obj.isoformat()
                 item_copy['date_str'] = dt_obj.strftime('%Y-%m-%d %H:%M:%S')
                 # Optionally, normalize the 'date' field too if successfully parsed:
-                item_copy['date'] = dt_obj.isoformat() 
+                item_copy['date'] = dt_obj.isoformat()
             except Exception:
                 item_copy['sortable_date'] = raw_date # Use raw string if parsing fails
                 item_copy['date_str'] = raw_date
@@ -387,12 +387,12 @@ def download_html():
             item_copy['date'] = None # Or '' - make it explicitly JSON serializable
             item_copy['sortable_date'] = ''
             item_copy['date_str'] = 'N/A'
-        
+
         # Ensure all other relevant fields for the HTML are strings for JSON dump
         for key in ['from', 'to', 'cc', 'subject', 'summary', 'relevant_parties', 'body']:
             if item_copy.get(key) is None:
                 item_copy[key] = "" # Convert None to empty string for these fields
-        
+
         emails_for_export.append(item_copy)
 
     reverse_order = True if sort_order_param == 'newest_first' else False
@@ -443,7 +443,7 @@ def download_html():
 </head>
 <body>
     <h1>Email Timeline Export</h1>
-    
+
     <div id="timeline-container">
         <p>Loading timeline from embedded data...</p>
     </div>

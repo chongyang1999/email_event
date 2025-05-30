@@ -60,10 +60,10 @@ class TestEmailParser(unittest.TestCase):
         )
 
     def _create_temp_eml_file(self, content):
-        # When writing in text mode ('w'), Python handles newline conversion 
+        # When writing in text mode ('w'), Python handles newline conversion
         # (e.g., '\n' to os.linesep). So, content string should just use '\n'.
         tmp_file = NamedTemporaryFile(mode='w', delete=False, suffix=".eml", encoding='utf-8')
-        tmp_file.write(content) 
+        tmp_file.write(content)
         tmp_file.close()
         return tmp_file.name
 
@@ -78,14 +78,14 @@ class TestEmailParser(unittest.TestCase):
         # The simplest for now, if allowed, is to try and reset it here,
         # or better, make parse_email_file accept it as an argument.
         # Assuming we can't modify parse_email_file, we'll proceed.
-        # One way to handle this in tests without modifying the source code 
+        # One way to handle this in tests without modifying the source code
         # is to re-import the module, but that's more complex.
         # For now, we'll note that email IDs will increment across tests.
-        
+
         original_counter = 0 # Assuming default start
         if 'email_id_counter' in sys.modules['app.app'].__dict__:
              original_counter = sys.modules['app.app'].__dict__['email_id_counter']
-        
+
         parsed_data = parse_email_file(tmp_filepath)
         os.unlink(tmp_filepath)
 
@@ -102,7 +102,7 @@ class TestEmailParser(unittest.TestCase):
         self.assertTrue(parsed_data.get('summary', '').startswith("This is the body of the test email."))
         self.assertTrue(parsed_data.get('summary', '').endswith("..."))
         # Summary length is 150 chars + "..." (3 chars)
-        self.assertEqual(len(parsed_data.get('summary', '')), 150 + 3) 
+        self.assertEqual(len(parsed_data.get('summary', '')), 150 + 3)
         self.assertIsInstance(parsed_data.get('date'), datetime)
 
     def test_parse_eml_with_cc(self):
@@ -113,7 +113,7 @@ class TestEmailParser(unittest.TestCase):
         tmp_filepath = self._create_temp_eml_file(self.eml_with_cc_content)
         parsed_data = parse_email_file(tmp_filepath)
         os.unlink(tmp_filepath)
-        
+
         if 'email_id_counter' in sys.modules['app.app'].__dict__:
             sys.modules['app.app'].__dict__['email_id_counter'] = original_counter
 
@@ -132,7 +132,7 @@ class TestEmailParser(unittest.TestCase):
 
         if app_module and hasattr(app_module, 'email_id_counter'):
             app_module.email_id_counter = original_counter
-        
+
         self.assertIsNotNone(parsed_data)
         self.assertIsInstance(parsed_data.get('date'), datetime)
 
@@ -142,13 +142,13 @@ class TestAppRoutes(unittest.TestCase):
     def setUp(self):
         if app is None:
             self.skipTest("Skipping route tests: Flask app could not be imported.")
-        
+
         app.testing = True
         self.client = app.test_client()
-        
+
         # Reset global state for emails before each test
         if app_module:
-            app_module.parsed_emails[:] = [] 
+            app_module.parsed_emails[:] = []
             app_module.email_id_counter = 0 # Reset counter
 
             # Add sample emails
@@ -166,11 +166,11 @@ class TestAppRoutes(unittest.TestCase):
         if not app_module: self.skipTest("App module not loaded")
         initial_count = len(app_module.parsed_emails)
         response = self.client.post('/delete_email/1') # Assuming ID 1 exists from setUp
-        
+
         self.assertEqual(response.status_code, 200)
         json_data = response.get_json()
         self.assertEqual(json_data['status'], 'success')
-        
+
         self.assertEqual(len(app_module.parsed_emails), initial_count - 1)
         ids_remaining = [email['id'] for email in app_module.parsed_emails]
         self.assertNotIn(1, ids_remaining)
@@ -180,12 +180,12 @@ class TestAppRoutes(unittest.TestCase):
         if not app_module: self.skipTest("App module not loaded")
         initial_count = len(app_module.parsed_emails)
         response = self.client.post('/delete_email/999') # Non-existent ID
-        
+
         self.assertEqual(response.status_code, 404)
         json_data = response.get_json()
         self.assertEqual(json_data['status'], 'error')
         self.assertEqual(json_data['message'], 'Email not found')
-        
+
         self.assertEqual(len(app_module.parsed_emails), initial_count) # List should be unchanged
 
 if __name__ == '__main__':

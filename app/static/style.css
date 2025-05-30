@@ -37,13 +37,13 @@
 .email-summary-preview {
     font-size: 0.9em;
     color: #333;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    /* max-width: 60%; */ /* Removed to allow it to take available space */
-    /* Flex properties will handle its ability to grow and shrink. */
-    flex-grow: 1; /* Allows the summary to take up remaining space */
-    min-width: 0; /* Important for text-overflow to work in flex items */
+    white-space: pre-line; /* Allows line breaks, collapses multiple spaces */
+    display: block; /* Ensure it can take up vertical space */
+    margin-top: 5px; /* Add some spacing if needed */
+    max-height: 120px; /* Example max height for scrollability */
+    overflow-y: auto;  /* Add scroll if content exceeds max height */
+    flex-grow: 1;
+    min-width: 0;
 }
 
 .email-details {
@@ -53,8 +53,8 @@
 }
 
 .editable-summary, .editable-parties {
-    display: inline-block; 
-    min-width: 100px; 
+    display: inline-block;
+    min-width: 100px;
     padding: 3px;
     border: 1px dashed #ccc;
     background-color: #fff; /* Ensure it's distinct from details background */
@@ -73,6 +73,6 @@
 }
 
 .email-body pre {
-    white-space: pre-wrap; 
+    white-space: pre-wrap;
     word-wrap: break-word;
 }

@@ -1,6 +1,69 @@
+// Global helper function to call Gemini API
+async function callGeminiApi(apiKey, prompt, emailContent) {
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+
+    const requestBody = {
+        contents: [{
+            parts: [{"text": prompt + "\n\nEmail Content to Analyze:\n" + emailContent}]
+        }],
+        generationConfig: { // Optional, but good to have some control
+            temperature: 0.4,
+            maxOutputTokens: 1024,
+        }
+    };
+
+    try {
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
+        });
+
+        if (!response.ok) {
+            let errorDetails = `HTTP error! status: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                if (errorData && errorData.error && errorData.error.message) {
+                    errorDetails = errorData.error.message;
+                }
+            } catch (e) {
+                // If parsing error response fails, stick with the HTTP status
+            }
+            throw new Error(errorDetails);
+        }
+
+        const data = await response.json();
+
+        if (data.candidates && data.candidates.length > 0 &&
+            data.candidates[0].content && data.candidates[0].content.parts &&
+            data.candidates[0].content.parts.length > 0 &&
+            data.candidates[0].content.parts[0].text) {
+            return data.candidates[0].content.parts[0].text;
+        } else {
+            console.error("Unexpected response structure from Gemini API:", data);
+            throw new Error("Could not extract text from Gemini API response. Structure might have changed or no content generated.");
+        }
+
+    } catch (error) {
+        console.error("Error calling Gemini API:", error);
+        throw error;
+    }
+}
+
+
 document.addEventListener('DOMContentLoaded', () => {
     const timelineContainer = document.getElementById('timeline-container');
     let currentSortOrder = 'newest_first'; // Global state for sort order
+    window.LIVE_EMAIL_DATA = []; // Initialize for AI feature & live mode
+
+    const defaultPrompt = "Analyze the following email's content (which may include a thread of replies). Extract a chronological sequence of interactions or key points. For each, identify the approximate time (if mentioned), the main people involved in that specific part of the exchange (sender/recipients if discernible), and a brief summary of the event or information. Present this as a structured list or a few concise paragraphs. Focus on what happened, who was involved, and when for each distinct part of the email thread.";
+
+    const promptTextarea = document.getElementById('gemini-prompt');
+    if (promptTextarea) {
+        promptTextarea.value = defaultPrompt;
+    }
 
     async function fetchAndDisplayEmails() {
         const timelineContainer = document.getElementById('timeline-container');
@@ -16,9 +79,9 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             if (window.EMBEDDED_EMAILS) {
                 console.log("Using embedded email data.");
-                emailsToDisplay = [...window.EMBEDDED_EMAILS]; 
+                emailsToDisplay = [...window.EMBEDDED_EMAILS];
 
-                const sortKey = 'date'; 
+                const sortKey = 'date';
                 emailsToDisplay.sort((a, b) => {
                     const valA = a[sortKey] || '';
                     const valB = b[sortKey] || '';
@@ -31,16 +94,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         return valB.localeCompare(valA);
                     }
                 });
-                
+
                 const toggleSortBtn = document.getElementById('toggle-sort-btn');
                 if (toggleSortBtn) {
                     toggleSortBtn.textContent = currentSortOrder === 'newest_first' ? 'Sort: Newest First' : 'Sort: Oldest First';
                 }
 
-                timelineContainer.innerHTML = ''; 
+                timelineContainer.innerHTML = '';
                 if (emailsToDisplay.length === 0) {
                     timelineContainer.innerHTML = '<p>No emails in this export.</p>';
-                    return; 
+                    return;
                 }
             } else {
                 console.log("Fetching email data from server with sort order:", currentSortOrder);
@@ -55,19 +118,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         throw new Error(errorMsgFromServer);
                     }
                     const data = await response.json();
-                    
-                    timelineContainer.innerHTML = ''; 
-                    
+                    window.LIVE_EMAIL_DATA = data; // Populate for AI analysis
+
+                    timelineContainer.innerHTML = '';
+
                     if (!data || data.length === 0) {
                         timelineContainer.innerHTML = '<p>No emails to display. Upload an email file first.</p>';
-                        return; 
+                        return;
                     }
-                    emailsToDisplay = data; 
+                    emailsToDisplay = data; // Or [...data] if emailsToDisplay needs to be a new copy
                 } catch (error) {
+                    window.LIVE_EMAIL_DATA = []; // Clear on error
                     console.error('Error fetching live email data:', error);
                     timelineContainer.innerHTML = `<p>Error loading emails: ${error.message}. Please check server connection or try again.</p>`;
-                    operationStatus = 'error'; 
-                    return; 
+                    operationStatus = 'error';
+                    return;
                 }
             }
 
@@ -75,7 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 timelineContainer.innerHTML = '<p>No email content to display.</p>';
                 return;
             }
-            
+
             // Common rendering logic
             emailsToDisplay.forEach(email => {
                 const entryDiv = document.createElement('div');
@@ -126,6 +191,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 summaryEditableSpan.textContent = email.summary || 'N/A';
                 summaryEditableP.appendChild(summaryEditableSpan);
                 detailsDiv.appendChild(summaryEditableP);
+
+                // Display AI Error if present
+                if (email.aiError) {
+                    const aiErrorP = document.createElement('p');
+                    aiErrorP.style.color = 'red';
+                    aiErrorP.style.fontSize = '0.8em';
+                    aiErrorP.innerHTML = `<strong>AI Analysis Error:</strong> ${email.aiError}`;
+                    detailsDiv.appendChild(aiErrorP);
+                }
 
                 const relevantPartiesP = document.createElement('p');
                 relevantPartiesP.innerHTML = `<strong>Relevant Parties:</strong> `;
@@ -187,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (confirm('Are you sure you want to delete this email?')) {
                         if (window.EMBEDDED_EMAILS) {
                             window.EMBEDDED_EMAILS = window.EMBEDDED_EMAILS.filter(e => e.id !== currentEmailId);
-                            fetchAndDisplayEmails(); 
+                            fetchAndDisplayEmails();
                             alert('Email deleted from this exported file. Note: This change is not persisted to any server.');
                         } else {
                             fetch(`/delete_email/${currentEmailId}`, {
@@ -231,45 +305,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 timelineContainer.appendChild(entryDiv);
             });
 
-        } catch (error) { 
+        } catch (error) {
             console.error('A critical error occurred in fetchAndDisplayEmails:', error);
-            if (operationStatus === 'success') { 
+            if (operationStatus === 'success') {
                 timelineContainer.innerHTML = `<p>An unexpected error occurred while displaying emails: ${error.message}.</p>`;
             }
         }
     }
-    
+
     if (window.EMBEDDED_EMAILS) {
         const pdfBtn = document.getElementById('download-pdf-btn');
         if (pdfBtn) pdfBtn.style.display = 'none';
-        
         const htmlBtn = document.getElementById('download-html-btn');
         if (htmlBtn) htmlBtn.style.display = 'none';
-        
-        const toggleSortBtn = document.getElementById('toggle-sort-btn'); // Get reference to sort button
-        if (toggleSortBtn) toggleSortBtn.style.display = 'none'; // Hide it
-        
-        const mainTitle = document.querySelector('h1'); 
+
+        const mainTitle = document.querySelector('h1');
         if (mainTitle) mainTitle.textContent = 'Email Timeline (Exported View)';
 
         if (window.EMBEDDED_SORT_ORDER) {
             currentSortOrder = window.EMBEDDED_SORT_ORDER;
         }
     }
-    
+
     fetchAndDisplayEmails(); // Initial call
 
     const downloadPdfButton = document.getElementById('download-pdf-btn');
     if (downloadPdfButton) {
         downloadPdfButton.addEventListener('click', () => {
             console.log('Requesting PDF download with sort order:', currentSortOrder);
-            window.location.href = `/download_pdf?sort_order=${currentSortOrder}`; 
+            window.location.href = `/download_pdf?sort_order=${currentSortOrder}`;
         });
     }
 
     const toggleSortButton = document.getElementById('toggle-sort-btn');
     if (toggleSortButton) {
-        toggleSortButton.addEventListener('click', function() { 
+        toggleSortButton.addEventListener('click', function() {
             if (currentSortOrder === 'newest_first') {
                 currentSortOrder = 'oldest_first';
             } else {
@@ -280,16 +350,83 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!window.EMBEDDED_EMAILS) {
                  this.textContent = currentSortOrder === 'newest_first' ? 'Sort: Newest First' : 'Sort: Oldest First';
             }
-            console.log("Current sort order:", currentSortOrder); 
-            fetchAndDisplayEmails(); 
+            console.log("Current sort order:", currentSortOrder);
+            fetchAndDisplayEmails();
         });
     }
 
     const downloadHtmlButton = document.getElementById('download-html-btn');
     if (downloadHtmlButton) {
         downloadHtmlButton.addEventListener('click', () => {
-            console.log('Requesting HTML download with sort order:', currentSortOrder); 
+            console.log('Requesting HTML download with sort order:', currentSortOrder);
             window.location.href = `/download_html?sort_order=${currentSortOrder}`;
+        });
+    }
+
+    const analyzeEmailsAiBtn = document.getElementById('analyze-emails-ai-btn');
+    if (analyzeEmailsAiBtn) {
+        analyzeEmailsAiBtn.addEventListener('click', async function() { // Make listener async
+            const apiKeyInput = document.getElementById('gemini-api-key');
+            const promptTextarea = document.getElementById('gemini-prompt');
+
+            const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+            const currentPrompt = promptTextarea ? promptTextarea.value.trim() : '';
+
+            if (!apiKey) {
+                alert("Please enter your Gemini API Key.");
+                return;
+            }
+            if (!currentPrompt) {
+                alert("AI Prompt cannot be empty.");
+                return;
+            }
+
+            // Determine data source
+            const emailDataSource = window.EMBEDDED_EMAILS ? window.EMBEDDED_EMAILS : window.LIVE_EMAIL_DATA;
+
+            if (!emailDataSource || emailDataSource.length === 0) {
+                alert("No emails loaded to analyze.");
+                return;
+            }
+
+            const originalButtonText = this.textContent; // Save original text
+            this.disabled = true;
+            this.textContent = 'Analyzing... Please wait...';
+
+            let successCount = 0;
+            let errorCount = 0;
+
+            try {
+                for (const email of emailDataSource) {
+                    try {
+                        // Optional: Update UI for specific email being processed
+                        // const summaryPreviewSpan = document.querySelector(`#email-entry-${email.id} .email-summary-preview`); // Requires email-entry-id
+                        // if(summaryPreviewSpan) summaryPreviewSpan.textContent = "AI Analyzing...";
+
+                        const aiSummary = await callGeminiApi(apiKey, currentPrompt, email.body);
+                        email.summary = aiSummary; // Update the summary in the JS data source
+                        // If you added an aiError field, clear it:
+                        delete email.aiError;
+                        successCount++;
+                    } catch (error) {
+                        console.error(`Error analyzing email ID ${email.id}:`, error);
+                        // Optionally store error on email object:
+                        email.aiError = error.message; // Store error message for potential display
+                        errorCount++;
+                    }
+                }
+            } finally { // Ensure button is re-enabled and text restored
+                this.disabled = false;
+                this.textContent = originalButtonText;
+            }
+
+            // Re-render the entire timeline to reflect new summaries (and clear/show AI errors)
+            fetchAndDisplayEmails();
+
+            alert(`AI analysis finished.
+Successfully processed: ${successCount} email(s).
+Failed: ${errorCount} email(s).` +
+(errorCount > 0 ? "\nCheck console for error details or if specific emails show an error." : ""));
         });
     }
 });

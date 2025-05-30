@@ -24,6 +24,23 @@
         <button id="download-html-btn" style="margin-left: 10px;">Download as HTML (.html)</button>
     </div>
 
+    <fieldset id="ai-tools-section" style="margin-top: 20px; margin-bottom: 20px; padding: 10px; border: 1px solid #ccc;">
+        <legend>AI Analysis Tools</legend>
+        <div>
+            <label for="gemini-api-key">Gemini API Key:</label>
+            <input type="password" id="gemini-api-key" name="gemini-api-key" style="width: 300px; margin-left: 5px;" placeholder="Enter your Gemini API Key">
+        </div>
+
+        <div style="margin-top: 10px;">
+            <label for="gemini-prompt">AI Prompt:</label><br>
+            <textarea id="gemini-prompt" name="gemini-prompt" rows="5" style="width: 90%; margin-top: 5px;"></textarea>
+        </div>
+
+        <div style="margin-top: 10px;">
+            <button id="analyze-emails-ai-btn">Analyze Emails with AI</button>
+        </div>
+    </fieldset>
+
     <div id="timeline-container">
         <p>Loading emails...</p>
     </div>
