@@ -32,6 +32,14 @@
         </div>
 
         <div style="margin-top: 10px;">
+            <label for="gemini-model-select" style="margin-right: 5px;">Select AI Model:</label>
+            <select id="gemini-model-select" name="gemini-model-select">
+                <option value="gemini-1.0-pro" selected>Gemini 1.0 Pro (Default)</option>
+                <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Latest)</option>
+            </select>
+        </div>
+
+        <div style="margin-top: 10px;">
             <label for="gemini-prompt">AI Prompt:</label><br>
             <textarea id="gemini-prompt" name="gemini-prompt" rows="5" style="width: 90%; margin-top: 5px;"></textarea>
         </div>

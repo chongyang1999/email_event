@@ -1,6 +1,6 @@
 // Global helper function to call Gemini API
-async function callGeminiApi(apiKey, prompt, emailContent) {
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+async function callGeminiApi(apiKey, modelName, prompt, emailContent) {
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
     const requestBody = {
         contents: [{
@@ -393,6 +393,10 @@ document.addEventListener('DOMContentLoaded', () => {
             this.disabled = true;
             this.textContent = 'Analyzing... Please wait...';
 
+            // Get the selected model from the dropdown
+            const modelSelectElement = document.getElementById('gemini-model-select');
+            const selectedModel = modelSelectElement ? modelSelectElement.value : 'gemini-1.0-pro'; // Use selected value, fallback to default
+
             let successCount = 0;
             let errorCount = 0;
 
@@ -403,7 +407,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         // const summaryPreviewSpan = document.querySelector(`#email-entry-${email.id} .email-summary-preview`); // Requires email-entry-id
                         // if(summaryPreviewSpan) summaryPreviewSpan.textContent = "AI Analyzing...";
 
-                        const aiSummary = await callGeminiApi(apiKey, currentPrompt, email.body);
+                        // Pass selectedModel to callGeminiApi
+                        const aiSummary = await callGeminiApi(apiKey, selectedModel, currentPrompt, email.body);
                         email.summary = aiSummary; // Update the summary in the JS data source
                         // If you added an aiError field, clear it:
                         delete email.aiError;
