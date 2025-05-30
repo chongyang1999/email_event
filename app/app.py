@@ -458,7 +458,7 @@ def download_html():
 
     <script type="text/javascript">
         // Embed the email data
-        window.EMBEDDED_EMAILS = JSON.parse('{emails_json_string}');
+        window.EMBEDDED_EMAILS = {emails_json_string}; // Corrected: json.dumps output is already a valid JS literal
         window.EMBEDDED_SORT_ORDER = '{sort_order_param}'; // Embed sort order as well
 
         // Include the original script content
