@@ -444,14 +444,6 @@ def download_html():
 <body>
     <h1>Email Timeline Export</h1>
     
-    <div style="text-align: center; margin: 20px;">
-        <!-- Static export might not need functional buttons, or they can be adapted -->
-        <button onclick="alert('Sorting not available in static export. Data is pre-sorted as per selection: {sort_order_param}.');">
-            Sort: {'Newest First' if sort_order_param == 'newest_first' else 'Oldest First'}
-        </button>
-        <button onclick="alert('PDF download not available in static export.');">Download Timeline as PDF</button>
-    </div>
-
     <div id="timeline-container">
         <p>Loading timeline from embedded data...</p>
     </div>

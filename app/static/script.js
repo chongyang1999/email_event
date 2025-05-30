@@ -242,8 +242,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.EMBEDDED_EMAILS) {
         const pdfBtn = document.getElementById('download-pdf-btn');
         if (pdfBtn) pdfBtn.style.display = 'none';
+        
         const htmlBtn = document.getElementById('download-html-btn');
         if (htmlBtn) htmlBtn.style.display = 'none';
+        
+        const toggleSortBtn = document.getElementById('toggle-sort-btn'); // Get reference to sort button
+        if (toggleSortBtn) toggleSortBtn.style.display = 'none'; // Hide it
         
         const mainTitle = document.querySelector('h1'); 
         if (mainTitle) mainTitle.textContent = 'Email Timeline (Exported View)';
