@@ -363,25 +363,35 @@ def download_html():
     for email_item in parsed_emails:
         item_copy = email_item.copy()
         raw_date = item_copy.get('date')
-        if hasattr(raw_date, 'isoformat'): # Datetime object
-            item_copy['sortable_date'] = raw_date.isoformat()
+
+        if hasattr(raw_date, 'isoformat'): # Is a datetime object
+            iso_date_str = raw_date.isoformat()
+            item_copy['date'] = iso_date_str # Main field for JS, must be JSON serializable string
+            item_copy['sortable_date'] = iso_date_str
             item_copy['date_str'] = raw_date.strftime('%Y-%m-%d %H:%M:%S')
-        elif isinstance(raw_date, str) and raw_date: # Non-empty string
-            try: # Try to parse to datetime then reformat, for consistency
+        elif isinstance(raw_date, str) and raw_date: # Is a non-empty string
+            # If it's already a string, assume it's either ISO or a display string.
+            # For JSON serialization, it's fine as is.
+            # For consistent sorting and display, try to parse it.
+            item_copy['date'] = raw_date # Keep original string if parsing fails for 'date' field
+            try:
                 dt_obj = parsedate_to_datetime(raw_date)
                 item_copy['sortable_date'] = dt_obj.isoformat()
                 item_copy['date_str'] = dt_obj.strftime('%Y-%m-%d %H:%M:%S')
-            except Exception: # If parsing fails, use as is
-                item_copy['sortable_date'] = raw_date
+                # Optionally, normalize the 'date' field too if successfully parsed:
+                item_copy['date'] = dt_obj.isoformat() 
+            except Exception:
+                item_copy['sortable_date'] = raw_date # Use raw string if parsing fails
                 item_copy['date_str'] = raw_date
-        else: # None or other types
+        else: # None, empty string, or other types
+            item_copy['date'] = None # Or '' - make it explicitly JSON serializable
             item_copy['sortable_date'] = ''
             item_copy['date_str'] = 'N/A'
         
-        # Ensure all relevant fields for the HTML are strings for JSON dump
+        # Ensure all other relevant fields for the HTML are strings for JSON dump
         for key in ['from', 'to', 'cc', 'subject', 'summary', 'relevant_parties', 'body']:
             if item_copy.get(key) is None:
-                item_copy[key] = "" # Or 'N/A' if preferred for display
+                item_copy[key] = "" # Convert None to empty string for these fields
         
         emails_for_export.append(item_copy)
 
