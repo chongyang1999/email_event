@@ -65,7 +65,9 @@ document.addEventListener('DOMContentLoaded', () => {
         promptTextarea.value = defaultPrompt;
     }
 
-    async function fetchAndDisplayEmails() {
+    async function fetchAndDisplayEmails(options = {}) { // Added options
+        const { forceFromServer = false } = options; // Destructure options
+
         const timelineContainer = document.getElementById('timeline-container');
         if (!timelineContainer) {
             console.error('Timeline container not found!');
@@ -96,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 const toggleSortBtn = document.getElementById('toggle-sort-btn');
-                if (toggleSortBtn) {
+                if (toggleSortBtn) { // This button is hidden in embedded mode, but check anyway
                     toggleSortBtn.textContent = currentSortOrder === 'newest_first' ? 'Sort: Newest First' : 'Sort: Oldest First';
                 }
 
@@ -105,34 +107,56 @@ document.addEventListener('DOMContentLoaded', () => {
                     timelineContainer.innerHTML = '<p>No emails in this export.</p>';
                     return;
                 }
-            } else {
-                console.log("Fetching email data from server with sort order:", currentSortOrder);
-                try {
-                    const response = await fetch(`/timeline_data?sort_order=${currentSortOrder}`);
-                    if (!response.ok) {
-                        let errorMsgFromServer = `HTTP error! status: ${response.status}`;
-                        try {
-                            const errData = await response.json();
-                            errorMsgFromServer = errData.message || errorMsgFromServer;
-                        } catch (jsonError) { /* Ignore */ }
-                        throw new Error(errorMsgFromServer);
+            } else { // Live Mode
+                if (forceFromServer || !window.LIVE_EMAIL_DATA || window.LIVE_EMAIL_DATA.length === 0) {
+                    console.log("Fetching email data from server. Force:", forceFromServer, "Sort:", currentSortOrder);
+                    try {
+                        const response = await fetch(`/timeline_data?sort_order=${currentSortOrder}`);
+                        if (!response.ok) {
+                            let errorMsgFromServer = `HTTP error! status: ${response.status}`;
+                            try { const errData = await response.json(); errorMsgFromServer = errData.message || errorMsgFromServer; } catch (jsonError) { /* Ignore */ }
+                            throw new Error(errorMsgFromServer);
+                        }
+                        const data = await response.json();
+                        window.LIVE_EMAIL_DATA = data; // Always update LIVE_EMAIL_DATA from fetch
+
+                        timelineContainer.innerHTML = '';
+
+                        if (!data || data.length === 0) {
+                            timelineContainer.innerHTML = '<p>No emails to display. Upload an email file first.</p>';
+                            return;
+                        }
+                        emailsToDisplay = data;
+                    } catch (error) {
+                        window.LIVE_EMAIL_DATA = []; // Clear on error
+                        console.error('Error fetching live email data:', error);
+                        timelineContainer.innerHTML = `<p>Error loading emails: ${error.message}. Please check server connection or try again.</p>`;
+                        operationStatus = 'error';
+                        return;
                     }
-                    const data = await response.json();
-                    window.LIVE_EMAIL_DATA = data; // Populate for AI analysis
+                } else {
+                    console.log("Using existing window.LIVE_EMAIL_DATA for live mode re-render. Sort:", currentSortOrder);
+                    emailsToDisplay = [...window.LIVE_EMAIL_DATA]; // Use a copy
+
+                    const sortKey = 'date';
+                    emailsToDisplay.sort((a, b) => {
+                        const valA = a[sortKey] || ''; const valB = b[sortKey] || '';
+                        if (valA === '' && valB === '') return 0; if (valA === '') return 1; if (valB === '') return -1;
+                        if (currentSortOrder === 'oldest_first') return valA.localeCompare(valB);
+                        else return valB.localeCompare(valA);
+                    });
+
+                    const toggleSortBtn = document.getElementById('toggle-sort-btn');
+                    if (toggleSortBtn) { // Update sort button text in live mode when using existing data
+                         toggleSortBtn.textContent = currentSortOrder === 'newest_first' ? 'Sort: Newest First' : 'Sort: Oldest First';
+                    }
 
                     timelineContainer.innerHTML = '';
-
-                    if (!data || data.length === 0) {
+                    if (emailsToDisplay.length === 0) {
+                        // This might occur if LIVE_EMAIL_DATA was manipulated to be empty
                         timelineContainer.innerHTML = '<p>No emails to display. Upload an email file first.</p>';
                         return;
                     }
-                    emailsToDisplay = data; // Or [...data] if emailsToDisplay needs to be a new copy
-                } catch (error) {
-                    window.LIVE_EMAIL_DATA = []; // Clear on error
-                    console.error('Error fetching live email data:', error);
-                    timelineContainer.innerHTML = `<p>Error loading emails: ${error.message}. Please check server connection or try again.</p>`;
-                    operationStatus = 'error';
-                    return;
                 }
             }
 
@@ -313,11 +337,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Initial setup based on mode - this remains here
     if (window.EMBEDDED_EMAILS) {
         const pdfBtn = document.getElementById('download-pdf-btn');
         if (pdfBtn) pdfBtn.style.display = 'none';
         const htmlBtn = document.getElementById('download-html-btn');
         if (htmlBtn) htmlBtn.style.display = 'none';
+
+        const toggleSortBtnHidden = document.getElementById('toggle-sort-btn'); // Renamed for clarity
+        if (toggleSortBtnHidden) toggleSortBtnHidden.style.display = 'none';
 
         const mainTitle = document.querySelector('h1');
         if (mainTitle) mainTitle.textContent = 'Email Timeline (Exported View)';
@@ -327,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    fetchAndDisplayEmails(); // Initial call
+    fetchAndDisplayEmails({ forceFromServer: true }); // Initial call: force fetch
 
     const downloadPdfButton = document.getElementById('download-pdf-btn');
     if (downloadPdfButton) {
@@ -348,10 +376,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // Button text will be updated by fetchAndDisplayEmails in embedded mode
             // For live mode, this.textContent might be preferable here if not done in fetchAndDisplayEmails
             if (!window.EMBEDDED_EMAILS) {
+                 // This text update is now handled by fetchAndDisplayEmails if using existing data,
+                 // or by the button itself if it triggers a fetch.
+                 // However, for immediate feedback before fetch completes (if forced), it's fine.
                  this.textContent = currentSortOrder === 'newest_first' ? 'Sort: Newest First' : 'Sort: Oldest First';
             }
             console.log("Current sort order:", currentSortOrder);
-            fetchAndDisplayEmails();
+            fetchAndDisplayEmails({ forceFromServer: true }); // Sort change should always re-fetch from server
         });
     }
 
@@ -425,8 +456,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.textContent = originalButtonText;
             }
 
-            // Re-render the entire timeline to reflect new summaries (and clear/show AI errors)
-            fetchAndDisplayEmails();
+            // Re-render the timeline using existing (modified) data in LIVE_EMAIL_DATA or EMBEDDED_EMAILS
+            fetchAndDisplayEmails({ forceFromServer: false }); // Do not force fetch, use local data
 
             alert(`AI analysis finished.
 Successfully processed: ${successCount} email(s).
