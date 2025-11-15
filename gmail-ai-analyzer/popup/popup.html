@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gmail AI Analyzer</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>📧 Gmail AI 分析器</h1>
+      <p class="subtitle">使用 Gemini AI 智能分析邮件</p>
+    </header>
+
+    <!-- 配置区域 -->
+    <section id="config-section" class="section">
+      <h2>⚙️ 配置</h2>
+
+      <div class="form-group">
+        <label for="api-key">
+          Gemini API Key
+          <a href="https://aistudio.google.com/app/apikey" target="_blank" class="help-link" title="点击获取API Key">
+            ❓
+          </a>
+        </label>
+        <div class="input-with-action">
+          <input
+            type="password"
+            id="api-key"
+            placeholder="输入你的 Gemini API Key"
+            autocomplete="off"
+          >
+          <button id="toggle-api-key" class="btn-icon" title="显示/隐藏">👁️</button>
+        </div>
+        <small class="hint">API Key 将安全地存储在本地浏览器中</small>
+      </div>
+
+      <div class="form-group">
+        <label for="model-select">AI 模型</label>
+        <select id="model-select">
+          <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash (推荐)</option>
+          <option value="gemini-2.5-flash-preview-05-20">Gemini 2.5 Flash Preview</option>
+          <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash</option>
+          <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro</option>
+          <option value="gemini-1.0-pro">Gemini 1.0 Pro</option>
+        </select>
+      </div>
+
+      <button id="save-config" class="btn btn-primary">💾 保存配置</button>
+      <div id="config-status" class="status-message"></div>
+    </section>
+
+    <!-- 分析区域 -->
+    <section id="analysis-section" class="section">
+      <h2>🔍 分析邮件</h2>
+
+      <div class="form-group">
+        <label for="prompt-input">分析提示词（可选）</label>
+        <textarea
+          id="prompt-input"
+          rows="3"
+          placeholder="留空使用默认提示词：提取邮件摘要、关键人物和重要时间点..."
+        ></textarea>
+      </div>
+
+      <button id="analyze-btn" class="btn btn-success">
+        <span class="btn-text">✨ 分析当前邮件</span>
+        <span class="spinner" style="display: none;">⏳</span>
+      </button>
+
+      <div id="analysis-status" class="status-message"></div>
+    </section>
+
+    <!-- 结果区域 -->
+    <section id="result-section" class="section" style="display: none;">
+      <h2>📊 分析结果</h2>
+
+      <div id="result-content" class="result-box">
+        <!-- 结果将动态插入这里 -->
+      </div>
+
+      <div class="action-buttons">
+        <button id="copy-result" class="btn btn-secondary">📋 复制结果</button>
+        <button id="new-analysis" class="btn btn-secondary">🔄 重新分析</button>
+      </div>
+    </section>
+
+    <!-- 帮助提示 -->
+    <section id="help-section" class="section help-box">
+      <h3>💡 使用提示</h3>
+      <ol>
+        <li>首次使用需要配置 Gemini API Key</li>
+        <li>在 Gmail 中打开任意邮件</li>
+        <li>点击此插件图标，然后点击"分析邮件"</li>
+        <li>AI 将自动提取邮件摘要、关键人物等信息</li>
+      </ol>
+      <p class="footer-note">
+        <a href="https://github.com/chongyang1999/email_event" target="_blank">查看项目文档</a>
+      </p>
+    </section>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

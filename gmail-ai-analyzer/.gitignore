@@ -1,0 +1,36 @@
+# OS Files
+.DS_Store
+Thumbs.db
+
+# IDE Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+
+# Temporary files
+*.tmp
+.cache/
+
+# User data (API keys, etc.)
+# Note: API keys are stored in Chrome Storage, not files
+config.json
+secrets.json
+.env
+
+# Build files
+dist/
+build/
+*.zip
+*.crx
+*.pem
