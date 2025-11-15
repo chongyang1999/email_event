@@ -121,6 +121,34 @@ function setupEventListeners() {
 }
 
 /**
+ * 检查并注入content script（如果需要）
+ */
+async function ensureContentScriptLoaded(tabId) {
+  try {
+    // 尝试发送测试消息
+    const response = await chrome.tabs.sendMessage(tabId, { action: 'checkGmailPage' });
+    return response.success;
+  } catch (error) {
+    // 如果失败，说明content script未注入，尝试手动注入
+    console.log('[Popup] Content script not found, injecting...');
+
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        files: ['content/gmail-reader.js']
+      });
+
+      // 等待一下让script初始化
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return true;
+    } catch (injectError) {
+      console.error('[Popup] Failed to inject content script:', injectError);
+      return false;
+    }
+  }
+}
+
+/**
  * 分析邮件主函数
  */
 async function analyzeEmail() {
@@ -142,6 +170,14 @@ async function analyzeEmail() {
 
     if (!tab || !tab.url?.includes('mail.google.com')) {
       throw new Error('请在Gmail页面使用此插件');
+    }
+
+    // 3.5 确保content script已加载
+    showStatus(elements.analysisStatus, 'info', '正在连接Gmail页面...');
+    const scriptLoaded = await ensureContentScriptLoaded(tab.id);
+
+    if (!scriptLoaded) {
+      throw new Error('无法连接到Gmail页面。请刷新页面后重试。');
     }
 
     // 4. 从content script提取邮件内容

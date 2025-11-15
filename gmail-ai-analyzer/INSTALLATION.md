@@ -212,14 +212,29 @@ cd email_event/gmail-ai-analyzer
 3. 点击"保存配置"按钮
 4. 刷新Gmail页面后重试
 
-### Q3: 显示"请在Gmail页面使用此插件"
+### Q3: 显示"Could not establish connection. Receiving end does not exist."
+
+**这是最常见的问题！**
+
+**原因**：安装或更新扩展后，Gmail页面的content script还没有加载。
+
+**解决方法**：
+1. **刷新Gmail页面**（按F5或点击刷新按钮）⭐ 最重要！
+2. 关闭Gmail标签页，重新打开
+3. 如果还不行，重启Chrome浏览器
+4. 最新版本已自动修复此问题，会自动注入脚本
+
+**为什么会这样**：
+Chrome扩展的content script只在页面加载时注入。如果你是在Gmail已经打开的情况下安装的扩展，就需要手动刷新页面。
+
+### Q4: 显示"请在Gmail页面使用此插件"
 
 **解决方法**：
 1. 确保你在 `https://mail.google.com` 域名下
 2. 确保已经打开了一封邮件（不是收件箱列表页）
 3. 刷新页面后重试
 
-### Q4: 显示"无法提取邮件内容"
+### Q5: 显示"无法提取邮件内容"
 
 **可能原因**：
 - Gmail页面还在加载中
@@ -232,7 +247,7 @@ cd email_event/gmail-ai-analyzer
 3. 刷新Gmail页面
 4. 如果问题持续，请[提交Issue](https://github.com/chongyang1999/email_event/issues)
 
-### Q5: API调用失败
+### Q6: API调用失败
 
 **可能原因**：
 - API Key无效或过期
@@ -245,14 +260,14 @@ cd email_event/gmail-ai-analyzer
 3. 检查网络连接
 4. 查看Chrome控制台错误信息（F12 > Console）
 
-### Q6: 分析结果不理想
+### Q7: 分析结果不理想
 
 **解决方法**：
 1. 尝试更换AI模型（如使用Gemini 1.5 Pro）
 2. 自定义提示词，明确你想要的分析角度
 3. 对于长邮件，AI可能会截断，可以考虑分段分析
 
-### Q7: 如何卸载扩展
+### Q8: 如何卸载扩展
 
 **步骤**：
 1. 访问 `chrome://extensions/`
