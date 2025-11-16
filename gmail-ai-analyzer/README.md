@@ -1,6 +1,6 @@
-# 📧 Gmail AI Analyzer
+# 📧 Gmail & Outlook AI Analyzer
 
-> 一个轻量级的Chrome扩展，使用Google Gemini AI智能分析Gmail邮件内容，提取关键信息，提升邮件处理效率。
+> 一个轻量级的Chrome扩展，使用Google Gemini AI智能分析Gmail和Outlook邮件内容，提取关键信息，提升邮件处理效率。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Chrome](https://img.shields.io/badge/Chrome-Extension-blue.svg)](https://www.google.com/chrome/)
@@ -12,7 +12,8 @@
 
 ## ✨ 特性
 
-- 🚀 **一键分析**：点击即可分析当前Gmail邮件
+- 🚀 **一键分析**：点击即可分析当前Gmail或Outlook邮件
+- 📮 **双平台支持**：同时支持Gmail和Outlook Web App
 - 🤖 **AI驱动**：基于Google Gemini 2.5 Flash，分析准确快速
 - 🎯 **智能提取**：自动提取邮件摘要、关键人物、时间点、行动项
 - 🔒 **隐私安全**：数据仅在本地和Google API之间传输，不经过第三方服务器
@@ -46,7 +47,7 @@ cd email_event/gmail-ai-analyzer
 
 1. 点击扩展图标
 2. 输入你的API Key
-3. 在Gmail中打开任意邮件
+3. 在Gmail或Outlook中打开任意邮件
 4. 点击"分析邮件"按钮
 5. 查看AI分析结果
 
@@ -117,7 +118,8 @@ gmail-ai-analyzer/
 │   ├── popup.css         # 样式设计
 │   └── popup.js          # 业务逻辑
 ├── content/              # 内容脚本
-│   └── gmail-reader.js   # Gmail页面内容提取
+│   ├── gmail-reader.js   # Gmail页面内容提取
+│   └── outlook-reader.js # Outlook页面内容提取
 ├── icons/                # 扩展图标
 │   ├── icon16.png
 │   ├── icon48.png
@@ -152,38 +154,45 @@ Gemini API
 
 ## 🚀 路线图
 
-### v1.0 - MVP ✅ (当前版本)
+### v1.0 - MVP ✅
 
-- [x] 基础邮件内容提取
+- [x] 基础Gmail邮件内容提取
 - [x] Gemini API集成
 - [x] 单封邮件分析
 - [x] 自定义提示词
 - [x] 多模型支持
 - [x] 结果复制功能
 
-### v1.1 - 增强版 (计划中)
+### v1.1 - 双平台支持 ✅ (当前版本)
 
+- [x] **Outlook Web App支持** 🎉
+- [x] 自动检测邮箱平台
+- [x] 统一的分析体验
 - [ ] 批量邮件分析
 - [ ] 历史分析记录
+
+### v1.2 - 增强版 (计划中)
+
 - [ ] 分析结果导出（JSON/CSV）
 - [ ] 侧边栏模式
 - [ ] 快捷键支持
-
-### v1.2 - 智能版 (未来)
-
 - [ ] 邮件智能分类
 - [ ] 自动标签建议
+
+### v1.3 - 智能版 (未来)
+
 - [ ] 回复建议生成
 - [ ] 邮件情感分析
 - [ ] 统计仪表板
+- [ ] 邮件优先级自动排序
 
 ### v2.0 - 生态版 (愿景)
 
-- [ ] 支持Outlook网页版
 - [ ] 移动端版本
 - [ ] 团队协作功能
 - [ ] Chrome Web Store发布
 - [ ] 企业版功能
+- [ ] 更多邮箱系统支持
 
 ---
 

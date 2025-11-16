@@ -1,4 +1,4 @@
-# Gmail AI Analyzer - 安装手册
+# Gmail & Outlook AI Analyzer - 安装手册
 
 ## 📋 目录
 
@@ -16,7 +16,7 @@
 ### 必需条件
 
 - ✅ Google Chrome 浏览器（版本 88 或更高）
-- ✅ Gmail账号
+- ✅ Gmail账号 或 Outlook账号（outlook.office.com / outlook.live.com）
 - ✅ Gemini API Key（免费申请）
 
 ### 可选条件
@@ -161,7 +161,7 @@ cd email_event/gmail-ai-analyzer
 
 ## 验证安装
 
-### 快速测试
+### 快速测试（Gmail）
 
 #### 步骤1：打开Gmail
 
@@ -171,17 +171,43 @@ cd email_event/gmail-ai-analyzer
 
 #### 步骤2：启动分析
 
-1. 点击Chrome工具栏上的 **Gmail AI Analyzer** 图标
+1. 点击Chrome工具栏上的扩展图标
 2. 在弹出窗口中，点击 **"✨ 分析当前邮件"** 按钮
 3. 等待几秒钟
 
 #### 步骤3：查看结果
 
 如果一切正常，你会看到：
-- ✅ 状态显示"正在提取邮件内容..."
-- ✅ 然后显示"正在使用AI分析邮件..."
+- ✅ 状态显示"正在连接Gmail页面..."
+- ✅ 然后显示"正在提取邮件内容..."
+- ✅ 接着显示"正在使用AI分析邮件..."
 - ✅ 最后显示"✓ 分析完成！"
 - ✅ 结果区域显示分析结果
+
+### 快速测试（Outlook）
+
+#### 步骤1：打开Outlook Web
+
+1. 访问 [https://outlook.office.com](https://outlook.office.com) 或 [https://outlook.live.com](https://outlook.live.com)
+2. 登录你的Outlook账号
+3. 在阅读窗格中打开任意一封邮件
+
+#### 步骤2：启动分析
+
+1. 点击Chrome工具栏上的扩展图标
+2. 在弹出窗口中，点击 **"✨ 分析当前邮件"** 按钮
+3. 等待几秒钟
+
+#### 步骤3：查看结果
+
+如果一切正常，你会看到：
+- ✅ 状态显示"正在连接Outlook页面..."
+- ✅ 然后显示"正在提取邮件内容..."
+- ✅ 接着显示"正在使用AI分析邮件..."
+- ✅ 最后显示"✓ 分析完成！"
+- ✅ 结果区域显示分析结果
+
+**注意**：Outlook需要在阅读窗格中打开邮件，不能只选中邮件而不打开。
 
 ### 检查清单
 
@@ -227,12 +253,18 @@ cd email_event/gmail-ai-analyzer
 **为什么会这样**：
 Chrome扩展的content script只在页面加载时注入。如果你是在Gmail已经打开的情况下安装的扩展，就需要手动刷新页面。
 
-### Q4: 显示"请在Gmail页面使用此插件"
+### Q4: 显示"请在Gmail或Outlook页面使用此插件"
 
 **解决方法**：
-1. 确保你在 `https://mail.google.com` 域名下
-2. 确保已经打开了一封邮件（不是收件箱列表页）
-3. 刷新页面后重试
+1. **Gmail用户**：确保你在 `https://mail.google.com` 域名下
+2. **Outlook用户**：确保你在 `https://outlook.office.com` 或 `https://outlook.live.com` 域名下
+3. 确保已经打开了一封邮件（不是收件箱列表页）
+4. 刷新页面后重试
+
+**Outlook特别提示**：
+- 必须在阅读窗格中打开邮件
+- 不能只选中邮件标题而不打开
+- 如果使用三栏布局，确保阅读窗格是打开的
 
 ### Q5: 显示"无法提取邮件内容"
 

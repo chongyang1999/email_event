@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Gmail AI Analyzer",
-  "version": "1.0.0",
-  "description": "使用Gemini AI分析Gmail邮件内容，提取关键信息和生成摘要",
+  "name": "Gmail & Outlook AI Analyzer",
+  "version": "1.1.0",
+  "description": "使用Gemini AI分析Gmail和Outlook邮件内容，提取关键信息和生成摘要",
   "permissions": [
     "activeTab",
     "storage",
@@ -10,6 +10,8 @@
   ],
   "host_permissions": [
     "https://mail.google.com/*",
+    "https://outlook.office.com/*",
+    "https://outlook.live.com/*",
     "https://generativelanguage.googleapis.com/*"
   ],
   "action": {
@@ -24,6 +26,14 @@
     {
       "matches": ["https://mail.google.com/*"],
       "js": ["content/gmail-reader.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://outlook.office.com/*",
+        "https://outlook.live.com/*"
+      ],
+      "js": ["content/outlook-reader.js"],
       "run_at": "document_idle"
     }
   ],
